@@ -1,0 +1,640 @@
+import { Col, Row } from "react-bootstrap";
+import vianex from "../../../../../assets/images/click2remit/vianex.png";
+import facebookRecpt from "../../../../../assets/images/click2remit/facebookRecpt.png";
+import trustwave_certificate from "../../../../../assets/images/click2remit/trustwave-certificate.png";
+import digicert_certificate from "../../../../../assets/images/click2remit/digicert-certificate.png";
+import twitterRecpt from "../../../../../assets/images/click2remit/twitterRecpt.png";
+import receipt_background from "../../../../../assets/images/click2remit/receipt_background.png";
+import c2r_logo_via from "../../../../../assets/images/click2remit/C2R_via_logo.png";
+import c2r_logo from "../../../../../assets/images/click2remit/C2R_logo_pre1.png";
+import footervilogo from "../../../../../assets/images/click2remit/footervialogo.png";
+
+const C2RInvoice = (props) => {
+  const data = props?.txnReceiptDetail;
+  let sendCountry = data?.sendCountry?.split("-");
+  let recvCountry = data?.recvCountry?.split("-");
+  let sendCountryCode = sendCountry[0];
+  let sendCurrencyCode = sendCountry[1];
+  let recvCountryCode = recvCountry[0];
+  let recvCurrencyCode = recvCountry[1];
+  return (
+    <div
+      ref={props.pdfRef}
+      style={{
+        position: "absolute",
+        marginTop: "-2000px",
+        height: "1400px",
+        width: "604px",
+        backgroundColor: "red",
+      }}
+    >
+      <div>
+        <table
+          cellPadding={0}
+          cellSpacing={0}
+          style={{
+            background: "#ffffff",
+          }}
+        >
+          <tbody>
+            <tr>
+              <td
+                style={{
+                  backgroundColor: "#ffffff",
+                  border: "none",
+                  width: "100%",
+                  padding: "10px 2px 7px 2px",
+                }}
+                valign="top"
+                colSpan={5}
+              >
+                {/* <img
+                  style={{ textAlign: "center" }}
+                  // src="https://s3.amazonaws.com/cdn.govianex.com/email-templates/logo_vianex.png"
+                  src={vianex}
+                /> */}
+                <img
+                  // className="img-responsive"
+                  src={c2r_logo}
+                  alt="Click 2 Remit"
+                  width="300px"
+                  height="50px"
+                />
+                {/* <img
+                  // className="img-responsive"
+                  src={c2r_logo_via}
+                  alt="Click 2 Remit"
+                  width="300px"
+                  height="50px"
+                /> */}
+                <img
+                  // className="img-responsive"
+                  src={footervilogo}
+                  alt="Click 2 Remit"
+                  width="300px"
+                  height="50px"
+                />
+              </td>
+            </tr>
+            <tr
+              style={{
+                width: "549%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <td>
+                <h1
+                  style={{
+                    color: "#0c5fa3",
+                    textTransform: "uppercase",
+                    fontSize: "22px",
+                    fontWeight: "bold",
+                    margin: "0 0 15px",
+                  }}
+                >
+                  Money Transfer Receipt
+                </h1>
+              </td>
+            </tr>
+            <tr>
+              <td
+                style={{
+                  backgroundColor: "#ffffff",
+                  border: "none",
+                  width: "100%",
+                  padding: "0 51px 15px",
+                  color: "#77777a",
+                  fontSize: "14px",
+                  lineHeight: "1.5",
+                }}
+                valign="top"
+                colSpan={5}
+              >
+                <p style={{ padding: 0, margin: 0 }}>
+                  Dear <strong style={{ color: "#5ab94f" }}>{data.customerName}</strong>,
+                </p>
+                <strong>Thank you for sending money with Viamericas.</strong>
+              </td>
+            </tr>
+            <tr>
+              <td
+                style={{
+                  backgroundColor: "#5ab94f",
+                  border: "none",
+                  width: "100%",
+                  padding: "10px 51px",
+                  color: "#ffffff",
+                  fontSize: "14px",
+                  lineHeight: "1.5",
+                }}
+                valign="top"
+                colSpan={5}
+              >
+                <p style={{ margin: 0, padding: 0, fontWeight: "bold" }}>
+                  Transaction NO.:{" "}
+                  <span style={{ fontWeight: "normal" }}>{data?.txnRefNumber}</span>
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td
+                style={{
+                  backgroundColor: "#429638",
+                  border: "none",
+                  width: "100%",
+                  padding: "10px 51px",
+                  color: "#ffffff",
+                  fontSize: "14px",
+                  lineHeight: "1.5",
+                }}
+                valign="top"
+                colSpan={5}
+              >
+                <p
+                  style={{
+                    margin: 0,
+                    padding: 0,
+                    textTransform: "uppercase",
+                    fontWeight: "bold",
+                  }}
+                >
+                  PASSWORD:{" "}
+                  <span style={{ fontWeight: "normal" }}>
+                    {/* {" "}
+                    {"{"}
+                    {"{"}FOLIONUMBER{"}"}
+                    {"}"}{" "} */}
+                  </span>
+                </p>
+                <p style={{ margin: 0, padding: 0, fontWeight: "normal" }}>
+                  For payments delivered in cash, remember to provide the recipient{" "}
+                  <strong>with the password detailed above</strong>.
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td
+                style={{
+                  backgroundColor: "#f8f8f8",
+                  border: "none",
+                  width: "100%",
+                  padding: "15px 51px",
+                  color: "#77777a",
+                  fontSize: "14px",
+                  lineHeight: 2,
+                }}
+                valign="top"
+                colSpan={5}
+              >
+                <h2
+                  style={{
+                    margin: "0 0 5px",
+                    fontWeight: "bold",
+                    textTransform: "uppercase",
+                    color: "#5ab94f",
+                    fontSize: "18px",
+                  }}
+                >
+                  Transaction Details
+                </h2>
+                <p style={{ margin: 0, padding: 0, fontWeight: "bold" }}>
+                  Transaction Date:{" "}
+                  <span style={{ color: "#5ab94f" }}>{data?.bookingDate?.split(" ")[0]}</span>
+                </p>
+                <p style={{ margin: 0, padding: 0, fontWeight: "bold" }}>
+                  Funds Available on:{" "}
+                  <span style={{ color: "#5ab94f" }}>
+                    {/* {" "}
+                    {"{"}
+                    {"{"}FUNDSAVAILABLE{"}"}
+                    {"}"}{" "} */}
+                    {/* //availabilityDate */}
+                    {data?.expDeliveryDate?.split(" ")[0]}
+                  </span>{" "}
+                  {/* <span style={{ fontWeight: "normal" }}>/ Maybe available sooner</span> */}
+                </p>
+                <p style={{ margin: 0, padding: 0, fontWeight: "bold" }}>
+                  Folio Number: <span style={{ color: "#5ab94f" }}>{data.viaFolio}</span>
+                </p>
+                <p style={{ margin: 0, padding: 0, fontWeight: "bold" }}>
+                  Payer Network: <span style={{ color: "#5ab94f" }}>Kotak Mahindra Bank Ltd.</span>
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td
+                style={{
+                  backgroundColor: "#f8f8f8",
+                  border: "none",
+                  width: "100%",
+                  padding: "15px 51px",
+                  color: "#77777a",
+                  fontSize: "14px",
+                  lineHeight: 2,
+                }}
+                valign="top"
+                colSpan={5}
+              >
+                <p style={{ margin: 0, padding: 0, fontWeight: "bold" }}>
+                  Transfer Amount:{" "}
+                  <span style={{ color: "#5ab94f" }}>
+                    {data.sendAmount} {sendCurrencyCode}
+                  </span>
+                </p>
+                <p style={{ margin: 0, padding: 0, fontWeight: "bold" }}>
+                  Transfer Fees:{" "}
+                  <span style={{ color: "#5ab94f" }}>
+                    {data?.fee} {sendCurrencyCode}
+                  </span>
+                </p>
+                <p style={{ margin: 0, padding: 0, fontWeight: "bold" }}>
+                  Transfer Taxes:{" "}
+                  <span style={{ color: "#5ab94f" }}>
+                    {data.feeTax} {sendCurrencyCode}
+                  </span>
+                </p>
+                <p style={{ margin: 0, padding: 0, fontSize: "18px", fontWeight: "bold" }}>
+                  Total Cost:{" "}
+                  <span style={{ color: "#5ab94f" }}>
+                    {data.amountPayable} {sendCurrencyCode}
+                  </span>
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td
+                style={{
+                  backgroundColor: "#f8f8f8",
+                  border: "none",
+                  width: "100%",
+                  padding: "15px 51px",
+                  color: "#77777a",
+                  fontSize: "14px",
+                  lineHeight: "1.5",
+                }}
+                valign="top"
+                colSpan={5}
+              ></td>
+            </tr>
+            <tr>
+              <td
+                style={{
+                  backgroundColor: "#f8f8f8",
+                  border: "none",
+                  width: "100%",
+                  padding: "15px 51px",
+                  color: "#77777a",
+                  fontSize: "14px",
+                  lineHeight: "1.5",
+                }}
+                valign="top"
+                colSpan={5}
+              >
+                <p style={{ margin: 0, padding: 0, fontWeight: "bold", color: "#0c5fa3" }}>
+                  Exchange Rate: 1 {sendCurrencyCode} = {data.exRate} {recvCurrencyCode}
+                </p>
+                <p style={{ margin: 0, padding: 0, fontSize: "18px", fontWeight: "bold" }}>
+                  Transfer Amount:{" "}
+                  <span style={{ color: "#5ab94f" }}>
+                    {data.amountPayable} {sendCurrencyCode}
+                  </span>
+                </p>
+                <p style={{ margin: 0, padding: 0, fontWeight: "bold" }}>
+                  Other Fees:{" "}
+                  <span style={{ color: "#5ab94f" }}>
+                    {data.fee} {recvCurrencyCode}
+                    {/* {" "}
+                    {"{"}
+                    {"{"}PAYOUTFEES{"}"}
+                    {"}"} {"{"}
+                    {"{"}RECIPIENTCURRENCY{"}"}
+                    {"}"} */}
+                  </span>
+                </p>
+                <p style={{ margin: 0, padding: 0, fontSize: "18px", fontWeight: "bold" }}>
+                  Total to Recipient:{" "}
+                  <span style={{ color: "#5ab94f" }}>
+                    {data.recvAmount} {recvCurrencyCode}
+                  </span>
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td
+                style={{
+                  backgroundColor: "#f8f8f8",
+                  border: "none",
+                  width: "100%",
+                  padding: "15px 51px",
+                  color: "#77777a",
+                  fontSize: "14px",
+                  backgroundSize: "cover",
+                  backgroundRepeat: "no-repeat",
+                  lineHeight: "1.5",
+                }}
+                valign="top"
+                colSpan={5}
+                background={receipt_background}
+                // background="https://s3.amazonaws.com/cdn.govianex.com/email-templates/receipt_background.jpg"
+              >
+                <table
+                  width="100%"
+                  border={0}
+                  cellSpacing={0}
+                  cellPadding={0}
+                  style={{
+                    borderCollapse: "collapse",
+                    height: "100%",
+                    margin: "0 auto",
+                    maxWidth: "600px",
+                    width: "100%",
+                    verticalAlign: "top",
+                  }}
+                >
+                  <tbody>
+                    <tr>
+                      <td
+                        style={{
+                          width: "100%",
+                          backgroundColor: "transparent",
+                          color: "#ffffff",
+                          lineHeight: "1.5",
+                          fontSize: "20px",
+                          fontWeight: "bold",
+                        }}
+                        valign="top"
+                        colSpan={5}
+                      >
+                        <div
+                          style={{
+                            backgroundColor: "#0c5fa3",
+                            borderRadius: "6px",
+                            color: "#ffffff",
+                            textAlign: "center",
+                            padding: "20px",
+                            fontSize: "20px",
+                            fontWeight: "bold",
+                            letterSpacing: "1px",
+                            margin: "0 auto",
+                          }}
+                        >
+                          <a
+                            href
+                            style={{
+                              textDecoration: "none",
+                              color: "#ffffff",
+                              backgroundColor: "#0c5fa3",
+                              fontSize: "20px",
+                              fontWeight: "bold",
+                            }}
+                          >
+                            {" "}
+                            Track your transaction
+                          </a>
+                        </div>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td
+                        style={{
+                          border: "none",
+                          padding: "20px 10px 0 0",
+                          width: "50%",
+                          backgroundColor: "transparent",
+                          color: "#77777a",
+                          fontSize: "14px",
+                          lineHeight: "1.5",
+                          height: "100%",
+                        }}
+                        valign="top"
+                      >
+                        <div style={{ backgroundColor: "#ffffff", padding: "51px 20px" }}>
+                          <h3
+                            style={{
+                              textTransform: "uppercase",
+                              color: "#0c5fa3",
+                              fontSize: "14px",
+                              margin: "0 0 5px",
+                            }}
+                          >
+                            Recipient Information
+                          </h3>
+                          <strong>{data.receiverName}</strong>
+                          <p style={{ padding: 0, margin: 0, fontWeight: "normal" }}>
+                            {data.recvAddress}
+                          </p>
+                          <p style={{ padding: 0, margin: 0, fontWeight: "normal" }}>
+                            {data.recvCity} - {data.recvState}
+                          </p>
+                          <p style={{ padding: 0, margin: 0, fontWeight: "normal" }}>
+                            {data.recvMobileNo}
+                          </p>
+                          <p style={{ padding: 0, margin: 0, fontWeight: "normal" }}>
+                            {data.recvCountry}
+                          </p>
+                        </div>
+                      </td>
+                      <td
+                        style={{
+                          border: "none",
+                          padding: "20px 0 0 10px",
+                          width: "50%",
+                          backgroundColor: "transparent",
+                          color: "#77777a",
+                          fontSize: "14px",
+                          lineHeight: "1.5",
+                          height: "100%",
+                        }}
+                        valign="top"
+                      >
+                        <div style={{ backgroundColor: "#ffffff", padding: "51px 20px" }}>
+                          <h3
+                            style={{
+                              textTransform: "uppercase",
+                              color: "#0c5fa3",
+                              fontSize: "14px",
+                              margin: "0 0 5px",
+                            }}
+                          >
+                            Sender Information
+                          </h3>
+                          <strong>{data.customerName}</strong>
+                          <p style={{ padding: 0, margin: 0, fontWeight: "normal" }}>
+                            {data.customerAddress1}
+                          </p>
+                          <p style={{ padding: 0, margin: 0, fontWeight: "normal" }}>
+                            {data.customerCity} - {data.customerState}
+                          </p>
+                          <p style={{ padding: 0, margin: 0, fontWeight: "normal" }}>
+                            {data.customerMobileNo}
+                          </p>
+                          <p style={{ padding: 0, margin: 0, fontWeight: "normal" }}>
+                            {data.sendCountry}
+                          </p>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td
+                style={{
+                  backgroundColor: "#0c5fa3",
+                  border: "none",
+                  width: "100%",
+                  padding: "15px 51px",
+                  color: "#ffffff",
+                  fontSize: "24px",
+                  lineHeight: "1.5",
+                  fontWeight: "bold",
+                }}
+                valign="top"
+                colSpan={5}
+              >
+                THANKS FOR CHOOSING VIANEX!
+              </td>
+            </tr>
+            <tr>
+              <td
+                style={{
+                  backgroundColor: "#ffff",
+                  border: "none",
+                  width: "100%",
+                  padding: "15px 51px",
+                  color: "#77777a",
+                  fontSize: "10px",
+                  lineHeight: "1.5",
+                }}
+                valign="top"
+                colSpan={5}
+              >
+                <p>
+                  {/* {"{"}
+                  {"{"}DISCLOSURE{"}"}
+                  {"}"} */}
+                </p>
+              </td>
+            </tr>
+            <tr
+              style={{
+                border: "none",
+                backgroundColor: "#5ab94f",
+                color: "#ffffff",
+                fontSize: "14px",
+                lineHeight: "1.5",
+                fontWeight: "normal",
+                textAlign: "left",
+              }}
+              valign="top"
+            >
+              <td style={{ width: "10%", border: "none" }} />
+              <td style={{ padding: "20px 0", width: "20%", border: "none" }} valign="top">
+                <div style={{ display: "block", marginBottom: "10px" }}>
+                  <a
+                    href="https://www.govianex.com/#!/about-us"
+                    style={{ color: "#ffffff", textDecoration: "none", padding: 0 }}
+                  >
+                    About Us
+                  </a>
+                </div>
+                <div style={{ display: "block", marginBottom: "10px" }}>
+                  <a
+                    href="https://www.govianex.com/#!/contact-us"
+                    style={{ color: "#ffffff", textDecoration: "none", padding: 0 }}
+                  >
+                    Contact Us
+                  </a>
+                </div>
+                <div style={{ display: "block", marginBottom: "10px" }}>
+                  <a
+                    href="https://www.govianex.com/#!/compliance"
+                    style={{ color: "#ffffff", textDecoration: "none", padding: 0 }}
+                  >
+                    Compliance
+                  </a>
+                </div>
+              </td>
+              <td style={{ padding: "20px 0", width: "30%", border: "none" }} valign="top">
+                <div style={{ display: "block", marginBottom: "10px" }}>
+                  <a
+                    href="https://www.govianex.com/api/legal-documents/privacy-policies/latest/content"
+                    style={{ color: "#ffffff", textDecoration: "none", padding: 0 }}
+                  >
+                    Privacy Policy
+                  </a>
+                </div>
+                <div style={{ display: "block", marginBottom: "10px" }}>
+                  <a
+                    href="https://www.govianex.com/#!/file-complaint"
+                    style={{ color: "#ffffff", textDecoration: "none", padding: 0 }}
+                  >
+                    File a Complaint
+                  </a>
+                </div>
+                <div style={{ display: "block", marginBottom: "10px" }}>
+                  <a
+                    href="https://www.govianex.com/api/legal-documents/terms-and-conditions/latest/content"
+                    style={{ color: "#ffffff", textDecoration: "none", padding: 0 }}
+                  >
+                    Terms and Conditions
+                  </a>
+                </div>
+              </td>
+              <td style={{ padding: "20px 0", width: "30%", border: "none" }} valign="top">
+                <div style={{ borderLeft: "1px solid #479F3D", paddingLeft: "37px" }}>
+                  <div style={{ display: "block", whiteSpace: "nowrap", marginBottom: "10px" }}>
+                    <a href="https://www.facebook.com/ViamericasDigital">
+                      <img
+                        src={facebookRecpt}
+                        // src="https://s3.amazonaws.com/cdn.govianex.com/email-confirmation-fb-icon_sm.png"
+                        style={{ height: "auto", paddingTop: "5px", margin: 0, width: "35px" }}
+                      />
+                    </a>
+                    <a href="https://twitter.com/Viamericas">
+                      <img
+                        // src="https://s3.amazonaws.com/cdn.govianex.com/email-confirmation-tw-icon_sm.png"
+                        src={twitterRecpt}
+                        style={{
+                          height: "auto",
+                          padding: "5px 0 0 5px",
+                          margin: 0,
+                          width: "35px",
+                        }}
+                      />
+                    </a>
+                  </div>
+                  <div style={{ display: "block", whiteSpace: "nowrap" }}>
+                    <img
+                      style={{ marginRight: "5px" }}
+                      src={digicert_certificate}
+                      width={55}
+                      alt="digicert-certificate.png"
+                    />
+                    <img
+                      style={{ marginLeft: "5px" }}
+                      src={trustwave_certificate}
+                      alt="trustwave-certificate.png"
+                    />
+                  </div>
+                </div>
+              </td>
+              <td style={{ width: "10%", border: "none" }} />
+            </tr>
+            <tr>
+              <td
+                style={{ backgroundColor: "#ffffff", padding: "20px 0", border: "none" }}
+                colSpan={5}
+              />
+            </tr>
+          </tbody>
+        </table>
+        {/* fix for Gmail auto-resize */}
+      </div>
+    </div>
+  );
+};
+export default C2RInvoice;
