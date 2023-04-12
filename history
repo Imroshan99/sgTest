@@ -1,0 +1,10 @@
+const history = useHistory();
+ useEffect(() => {
+    const unlisten = history.listen(() => {
+      // log the user out here
+    });
+
+    return () => {
+      unlisten();
+    };
+  }, [history]);
