@@ -1,0 +1,491 @@
+import React, { useEffect, useReducer, useState } from "react";
+import Main from "../Layouts/Main";
+import Chevronright from "../../../assets/images/click2remit/Chevronright.svg";
+import BackArrow from "../../../assets/images/click2remit/Back_arrow.svg";
+import searchpng from "../../../assets/images/click2remit/search.png";
+import bank1png from "../../../assets/images/click2remit/bank-1.png";
+import addsvg from "../../../assets/images/click2remit/Add.svg";
+import CustomInput from "../../../reusable/CustomInput";
+import FloatInput from "../../../reusable/FloatInput";
+import Spinner from "../../../reusable/Spinner";
+import { useSelector } from "react-redux";
+import useHttp from "../../../hooks/useHttp";
+import { BankAccountAPI } from "../../../apis/BankAccountAPI";
+import moment from "moment";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import Swal from "sweetalert2";
+import BankViaPlaid from "./BankViaPlaid";
+import { achBankAccountAPI } from "../../../apis/achBankAccountAPI";
+import { Modal, notification } from "antd";
+import { ViAmericaPlaidAPI } from "../../../apis/ViAmericaApi/PlaidAPI";
+import { ProfileAPI } from "../../../apis/ProfileAPI";
+
+const ManageRemitterAccounts = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const AuthReducer = useSelector((state) => state.user);
+  const [loader, setLoader] = useState(false);
+  const [state, setState] = useReducer((state, newState) => ({ ...state, ...newState }), {
+    bankAccountList: [],
+    newBankAccountList: [],
+    sessionId: AuthReducer.sessionId,
+    userID: AuthReducer.userID,
+    emailId: "",
+  });
+  const [redirectUrl, setRedirectUrl] = useState("");
+  const [isPlaidModal, setIsPlaidModal] = useState(false);
+
+  // const hookBankAccountList = useHttp(BankAccountAPI.bankAccountList);
+  const hookBankAccountList = useHttp(achBankAccountAPI.bankAccountList);
+  const hookViaGetFundingAcct = useHttp(ViAmericaPlaidAPI.viaGetFundingAcct);
+  const hookGetProfile = useHttp(ProfileAPI.getProfile);
+  const hookCreateLinkToken = useHttp(ViAmericaPlaidAPI.createLinkToken);
+  const hookAddBankAccount = useHttp(achBankAccountAPI.addBankAccount);
+  // const hookViewBankAccountDetails = useHttp(BankAccountAPI.viewBankAccountDetails);
+  // const hookDeleteBankAccountDetails = useHttp(BankAccountAPI.deleteBankAccountDetails);
+
+  useEffect(() => {
+    accountsList();
+    getUserProfile();
+    // viaGetFundingAcct();
+  }, []);
+  useEffect(() => {
+    // Create IE + others compatible event handler
+
+    var eventMethod = window.addEventListener ? "addEventListener" : "attachEvent";
+    var eventer = window[eventMethod];
+    var messageEvent = eventMethod == "attachEvent" ? "onmessage" : "message";
+    eventer(
+      messageEvent,
+      function (e) {
+        if (e.data.data == "PLAID_FAIL") {
+          setRedirectUrl("");
+        } else if (e.data.data == "PLAID_SUCCESS") {
+          setRedirectUrl("");
+          viaGetFundingAcct();
+          accountsList();
+        }
+      },
+      false,
+    );
+
+    // setInterval(function() {
+    //   console.log("parent received message!:  ", e.data);
+    // },1000);
+  }, []);
+  const getUserProfile = async (cb) => {
+    let payload = {
+      requestType: "USERPROFILE",
+      userId: AuthReducer.userID,
+    };
+    setLoader(true);
+    hookGetProfile.sendRequest(payload, function (data) {
+      setLoader(false);
+      if (data.status === "S") {
+        setState({ emailId: data.emailId });
+      }
+    });
+  };
+  const viaGetFundingAcct = () => {
+    const payload = {
+      requestType: "GETFUNDINGACCOUNT",
+      emailId: state.emailId,
+      userId: state.userID,
+      loginToken: window.sessionStorage.getItem("loginTokenId"),
+      idSenderGlobal: window.sessionStorage.getItem("idSenderGlobal"),
+    };
+    setLoader(true);
+    hookViaGetFundingAcct.sendRequest(payload, function (data) {
+      setLoader(false);
+      if (data.status === "S") {
+        // let demmy=[{
+        //   BankName: "Chase",
+        //   idPayment: "22129",
+        //   LoginRequired: false,
+        //   mask: "1111",
+        //   name: "Plaid Saving"
+        // }, {
+        //   BankName: "Chase",
+        //   idPayment: "22128",
+        //   LoginRequired: false,
+        //   mask: "0000",
+        //   name: "Plaid Checking"
+        // }]
+        const bankList = JSON.parse(data.message);
+        bankList.forEach((dataV) => {
+          addACHAccount(dataV);
+        });
+        // addACHAccount(JSON.parse(data.message)[0]);
+      } else {
+        notification.error({ message: data.errorMessage });
+      }
+    });
+  };
+  const addACHAccount = async (data) => {
+    let formData = {
+      requestType: "addACHAccount",
+      userId: AuthReducer.userID,
+      routingNumber: "000910000",
+      nickname: `${data.name.replaceAll(" ", "").toUpperCase()}${data.mask}`, //BankName+maskAcctno
+      accountHolder: data.name,
+      bankName: data.BankName,
+      accountNo: data.mask,
+      accountType: "S",
+      countryCode: AuthReducer.sendCountryCode,
+      currencyCode: AuthReducer.sendCurrencyCode,
+      processType: "ACH",
+      idPayment: data.idPayment ? data.idPayment : "43200",
+      // accountid: data.accountid,
+      // public_token: data.accessToken,
+    };
+    setLoader(true);
+    hookAddBankAccount.sendRequest(formData, function (res) {
+      setLoader(false);
+      // setIsModalVisible(false);
+      if (res.status === "S") {
+        notification.success({ message: res.message });
+        accountsList();
+        // if (location.pathname === "/create-account") {
+        //   // props.setState({ activeStepForm: 7 });
+        //   navigate("/new-transaction");
+        // } else if (location.pathname === "/manage-remitter-accounts") {
+        //   if (location?.state?.autoFill) {
+        //     navigate("/new-transaction", {
+        //       state: {
+        //         autoFillData: {
+        //           ...location?.state?.autoFillData,
+        //           sourceAccount: data.idPayment.toString(),
+        //         },
+        //         autoFill: location?.state?.autoFill,
+        //       },
+        //     });
+        //   } else {
+        //     navigate("/manage-remitter-accounts");
+        //   }
+        // }
+        // if (props.state.redirectPage === "NEW_TRANSACTION") {
+        //   navigate("/new-transaction", {
+        //     state: props.state.redirectPageState,
+        //   });
+        // } else {
+        //   navigate("/my-bank-accounts");
+        // }
+      } else {
+        // notification.error({ message: res.errorMessage });
+      }
+    });
+  };
+
+  // const accountsList = () => {
+  //   const payload = {
+  //     requestType: "SENDERACCOUNTLIST",
+  //     userId: state.userID,
+  //     fulName: state.fullName,
+  //     countryCode: "GB",
+  //     favouriteFlag: "1",
+  //     startIndex: "0",
+  //     recordsPerRequest: "",
+  //   };
+
+  //   setLoader(true);
+  //   hookBankAccountList.sendRequest(payload, function (data) {
+  //     if (data.status == "S") {
+  //       // settableRender(true);
+  //       let resData = [];
+  //       data.responseData.forEach((detail, i) => {
+  //         let newData = {
+  //           key: i,
+  //           accountHolderName: `${detail.accountHolderName}`,
+  //           sendAccId: `${detail.sendAccId}`,
+  //           recordToken: `${detail.recordToken}`,
+  //           bankName: `${detail.bankName}`,
+  //           accountNo: `${detail.accountNo}`,
+  //           bankClearingCode: `${detail.sortCode}`,
+  //           dateAdded: moment(detail.createdDate).format("MM-DD-YYYY"),
+  //           status: detail.accountStatus,
+  //         };
+  //         resData.push(newData);
+  //         console.log(newData, "resdata");
+  //       });
+  //       setState({
+  //         bankAccountList: resData,
+  //       });
+  //       console.log(state, "shubhh");
+  //       console.log(state.bankAccountList, "blist");
+  //       setLoader(false);
+  //       //    setContentRender(true);
+  //     } else {
+  //       setLoader(false);
+  //       // settableRender(false);
+  //       //    setContentRender(true);
+  //     }
+  //   });
+  // };
+
+  const accountsList = (nickName) => {
+    const payload = {
+      requestType: "SENDERACCOUNTLIST",
+      userId: state.userID,
+      countryCode: AuthReducer.sendCountryCode,
+      favouriteFlag: "1",
+      startIndex: "0",
+      recordsPerRequest: "50",
+    };
+    setLoader(true);
+    hookBankAccountList.sendRequest(payload, function (data) {
+      setLoader(false);
+      if (data.status === "S") {
+        if (nickName) {
+          let newBankAcct = data.responseData.filter((i) => {
+            return i.nickName == nickName;
+          });
+          if (location?.state?.autoFill) {
+            navigate("/new-transaction", {
+              state: {
+                autoFillData: {
+                  ...location?.state?.autoFillData,
+                  sourceAccount: newBankAcct[0].nickName,
+                },
+                autoFill: location?.state?.autoFill,
+              },
+            });
+          }
+        } else {
+          let resData = [];
+          data.responseData.forEach((detail, i) => {
+            let data1 = {
+              key: i,
+              nickName: `${detail.nickName}`,
+              aCHAccId: `${detail.aCHAccId}`,
+              recordToken: `${detail.recordToken}`,
+              bankName: `${detail.bankName}`,
+              accountNo: `${detail.accountNo}`,
+              routingNumber: `${detail.routingNumber}`,
+              dateAdded: moment(detail.createdDate).format("MM-DD-YYYY"),
+              status: detail.recordStatus.toUpperCase() === "R" ? "Verified" : "Pending",
+            };
+            resData.push(data1);
+          });
+          setState({
+            bankAccountList: resData,
+            newBankAccountList: resData,
+          });
+        }
+      }
+    });
+  };
+
+  const createLinkToken = () => {
+    const payload = {
+      requestType: "VIALINKTOKENCREATE",
+      userId: AuthReducer.userID,
+      emailId: state.emailId,
+      method: "POST",
+      loginToken: window.sessionStorage.getItem("loginTokenId"),
+      idSenderGlobal: window.sessionStorage.getItem("idSenderGlobal"),
+    };
+    setLoader(true);
+    hookCreateLinkToken.sendRequest(payload, function (res) {
+      setLoader(false);
+      if (res.status === "S") {
+        setIsPlaidModal(true);
+        setRedirectUrl(res.linkToken);
+      } else {
+        notification.error({ message: res.errorMessage });
+      }
+    });
+  };
+  const remitterFilter = (e) => {
+    let searchInput = e.target.value;
+    let newFilterRemitter = state.newBankAccountList.filter((i) => {
+      if (
+        i.bankName.toLowerCase().search(e.target.value.toLowerCase()) !== -1 ||
+        i.accountNo.toLowerCase().search(e.target.value.toLowerCase()) !== -1
+      ) {
+        return i;
+      }
+    });
+    console.log("rrrr newf", newFilterRemitter);
+    setState({ bankAccountList: newFilterRemitter });
+  };
+  return (
+    <Main>
+      <form>
+        <div className="container h-100">
+          <div class="row h-100">
+            <div className="CR-default-box CR-max-width-620">
+              <div className="CR-side-space">
+                <ul className="row ">
+                  <li className="back-arrow-nav d-xs-block d-done">
+                    <img src={BackArrow} alt="" />
+                  </li>
+
+                  <li className="col-md-12 col-sm-12 col-lg-12 mb-2">
+                    <h4 className="text-black CR-font-28 mb-1">
+                      {location?.state?.pathname == "/new-transaction"
+                        ? "Remitter Account list"
+                        : "Manage remitter account"}
+                    </h4>
+                  </li>
+                  {/* {AuthReducer.regCountryCode === "US" ? (<BankViaPlaid />) : (<> */}
+                  <li className="col-md-12 col-sm-12 col-lg-12 align-self-center mt-3">
+                    <div className="input-group search-input">
+                      <span className="position-absolute search-input-icon">
+                        <img src={searchpng} width="24px" height="24px" />
+                      </span>
+                      <input
+                        className="CR-border-bottom form-control rounded-pill"
+                        onChange={remitterFilter}
+                        type="input"
+                        placeholder="Search"
+                      />
+                    </div>
+                  </li>
+                  <li className="col-md-12 col-sm-12 col-lg-12 align-self-center text-start my-4">
+                    {/* {AuthReducer.regCountryCode === "US" ? (
+                  <BankViaPlaid accountsList={accountsList} />
+                ) : ( */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // navigate("/create-account", { state: { benificary: 13 } });
+                        createLinkToken();
+                      }}
+                      className="CR-blue-link CR-font-14 CR-fw-500 btn btn-link p-0"
+                    >
+                      <img
+                        src={addsvg}
+                        width="16px"
+                        height="16px"
+                        className="me-2"
+                        alt="ADD NEW REMITTER ACCOUNT"
+                      />
+                      ADD NEW REMITTER ACCOUNT
+                    </button>
+                    {/* )} */}
+                  </li>
+                  <li className="col-md-12 col-sm-12 col-lg-12 align-self-center">
+                    <p className="text-left mb-0 CR-font-14 CR-fw-500">Remitter accounts</p>
+                  </li>
+                  <Spinner spinning={loader}>
+                    <li className="col-md-12 col-sm-12 col-lg-12 mb-2 mt-1">
+                      <ul className="row">
+                        {state.bankAccountList.map((item, key) => {
+                          return (
+                            <li key={key} className="col-md-12 col-sm-12 col-lg-12">
+                              <div
+                                onClick={() => {
+                                  if (location?.state?.pathname == "/new-transaction") {
+                                    accountsList(item.nickName);
+                                  } else {
+                                    navigate("/remitter-account-details", {
+                                      state: { remitterData: item },
+                                    });
+                                  }
+                                }}
+                                style={{ cursor: "pointer" }}
+                                className="align-items-start d-flex justify-content-start w-100 CR-border-bottom-1 rounded-0 single-box shadow-none mb-0 px-0 py-3"
+                              >
+                                {/* <div className="CR-bank-logo me-3">
+                              <img src={bank1png} width="100%" height="100%" />
+                            </div> */}
+                                <div className="d-flex justify-content-between flex-column w-100">
+                                  <label className="CR-font-14 CR-black-text CR-fw-600 text-left mb-1">
+                                    {item.accountHolderName}{" "}
+                                  </label>
+                                  <p className="CR-font-12 text-left CR-fw-500 mb-0">
+                                    {item.bankName} <span>&#8226;</span> {item.accountNo}
+                                  </p>
+                                </div>
+
+                                <span>
+                                  <img src={Chevronright} alt=""></img>
+                                </span>
+                              </div>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </li>
+                    {location?.state?.pathname == "/new-transaction" ? (
+                      <div className="bottom_panel">
+                        <div className="d-flex justify-content-between align-items-baseline">
+                          <a
+                            onClick={() => {
+                              if (location?.state?.pathname === "/new-transaction") {
+                                if (location?.state?.autoFill) {
+                                  navigate("/new-transaction", {
+                                    state: {
+                                      autoFillData: {
+                                        ...location?.state?.autoFillData,
+                                      },
+                                      autoFill: location?.state?.autoFill,
+                                    },
+                                  });
+                                } else {
+                                  navigate("/new-transaction");
+                                }
+                              }
+                            }}
+                            className="Back_arrow"
+                          >
+                            {" "}
+                            <img src={BackArrow} alt="" />
+                            Back
+                          </a>
+                          {/* <button
+                        type="button"
+                        onClick={() => setState({ profileComponent: false })}
+                        className="btn btn-primary CR-primary-btn mb-3"
+                        style={{ width: "100px", margin: "0 !important" }}
+                      >
+                        Edit
+                      </button> */}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="bottom_panel">
+                        <div className="d-flex justify-content-between align-items-baseline">
+                          <span className="Back_arrow" onClick={() => navigate("/new-transaction")}>
+                            <img src={BackArrow} alt="" />
+                            Back
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </Spinner>
+
+                  {/* </>)
+                  } */}
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </form>
+      {redirectUrl && (
+        <Modal
+          className="CR_jumio_modal"
+          // width="auto"
+          open={isPlaidModal}
+          footer={null}
+          // closable={false}
+          // maskClosable={false}
+          // onOk={handleOk}
+          onCancel={() => setIsPlaidModal(false)}
+        >
+          <iframe
+            title="plaid"
+            src={redirectUrl}
+            width="100%"
+            height="500px"
+            allow="camera;fullscreen;accelerometer;gyroscope;magnetometer"
+            allowfullscreen
+          ></iframe>
+        </Modal>
+      )}
+    </Main>
+  );
+};
+
+export default ManageRemitterAccounts;
