@@ -1,0 +1,828 @@
+import BackArrow from "../../../assets/images/click2remit/Back_arrow.svg";
+import CustomInput from "../../../reusable/CustomInput";
+import FloatInput from "../../../reusable/FloatInput";
+import { Checkbox, DatePicker, Form, notification, Select } from "antd";
+import moment from "moment";
+import { useNavigate } from "react-router-dom";
+import { useEffect, useReducer, useState } from "react";
+import useHttp from "../../../hooks/useHttp";
+import { GuestAPI } from "../../../apis/GuestAPI";
+import { AuthAPI } from "../../../apis/AuthAPI";
+import { useSelector } from "react-redux";
+import Spinner from "../../../reusable/Spinner";
+import { inputValidations } from "../../../services/validations/validations";
+import { Col, Row } from "react-bootstrap";
+import { ProfileAPI } from "../../../apis/ProfileAPI";
+import { validateEmailId } from "../../../services/validations/email";
+
+export default function CreatePersonalDetails(props) {
+  const { Option } = Select;
+  const { form } = props;
+
+  const navigate = useNavigate();
+  const AuthReducer = useSelector((state) => state.user);
+  const [loader, setLoader] = useState(false);
+  const [reverseTimer, setReverseTimer] = useState("5m 00s");
+  const [intervalID, setInterID] = useState();
+  const [state, setState] = useReducer((state, newState) => ({ ...state, ...newState }), {
+    phoneCodes: [],
+    dob: "",
+    gender: "",
+    _CRNNumber: "",
+    _CRNOTPVerificationToken: "",
+    _OTPCode: "",
+    _CRNDetails: {},
+    mobileNoInp: true,
+    mobilePhoneCode: "",
+    mobileNo: "",
+    verifyOtpBtn: true,
+    backBtn: false,
+    pickerField: false,
+  });
+
+  const hookcheckLoginId = useHttp(AuthAPI.checkLoginId);
+  const hookCrnDetails = useHttp(AuthAPI.crnDetails);
+  const hookGetCountryPhoneCodes = useHttp(GuestAPI.getCountryPhoneCodes);
+  const hookSendOtp = useHttp(ProfileAPI.sendOTP);
+  const hookVerifyOTP = useHttp(GuestAPI.verifyOTP);
+  const hookReSendOTP = useHttp(GuestAPI.reSendOTP);
+
+  useEffect(() => {
+    getCoutryCodes();
+  }, []);
+
+  const reverseTimerOnLoad = () => {
+    clearInterval(intervalID);
+
+    let validityAuctionEndTime = moment().add(5, "minutes");
+    const second = 1000,
+      minute = second * 60,
+      hour = minute * 60,
+      day = hour * 24;
+
+    let countDown = new Date(`${validityAuctionEndTime}`).getTime();
+
+    let letintervalID = setInterval(function () {
+      let now = new Date().getTime(),
+        distance = countDown - now;
+
+      var getDay = Math.floor(distance / day);
+
+      var getHour = Math.floor((distance % day) / hour);
+
+      var getMinute = Math.floor((distance % hour) / minute);
+
+      var secound = Math.floor((distance % minute) / second);
+      let getSecound = secound > 9 ? secound : 0 + secound;
+
+      let cDay = getDay !== 0 ? `${getDay}d` : "";
+      let cHour = getHour !== 0 ? `${getHour}h` : "";
+      let cMinute = getMinute !== 0 ? `${getMinute}m` : "";
+      let cSecound = getSecound !== 0 ? `${getSecound}s` : "";
+      let timer = `${cDay} ${cHour} ${cMinute} ${cSecound}`;
+
+      if (distance <= 0) {
+        clearInterval(intervalID);
+      } else {
+        setReverseTimer(timer);
+      }
+    }, second);
+    setInterID(letintervalID);
+  };
+
+  const submitHandler = (values) => {
+    if (moment(props.state.dob, "YYYY-MM-DD").fromNow().split(" ")[0] >= 18) {
+      // if (moment("2009-04-10", "YYYY-MM-DD").fromNow().split(" ")[0] >= 18) {
+      // underage dob bypass
+      let value = { ...values, gender: state.gender };
+      setLoader(true);
+      let postData = {
+        requestType: "CHECKLOGINID",
+        loginId: value.email,
+      };
+      hookcheckLoginId.sendRequest(postData, function (data) {
+        setLoader(false);
+        if (data.status == "S") {
+          props.setState({ personalDetails: value, activeStepForm: 2 });
+        } else {
+          notification.error({ message: data.errorMessage });
+          form.setFields([{ name: "email", errors: [data.errorMessage] }]);
+        }
+      });
+    } else {
+      form.setFields([{ name: "dob", errors: ["You must be 18 years old or above to proceed"] }]);
+    }
+  };
+
+  const getCRNDetails = () => {
+    if (state._CRNNumber.length >= 1) {
+      let payload = {
+        requestType: "CRNDETAILS",
+        crnNumber: state._CRNNumber, //"dummy crnNumber": "100881179",
+        bankAcctStatusCode: "Y",
+        apiType: "SIGNUP",
+      };
+      setLoader(true);
+      hookCrnDetails.sendRequest(payload, function (data) {
+        // hookCrnDetails.sendRequest(payload, function (data1) {
+        //   let data = { ...data1, mobile_NO: "12346478489" };
+        // bypass for mobile number
+        setLoader(false);
+        if (data.status === "S") {
+          if (data?.mobile_NO.length == 0) {
+            form.setFields([{ name: "crn", errors: ["Mobile number cannot be blank"] }]);
+          } else if (data?.mobile_NO.length < 11) {
+            form.setFields([
+              { name: "crn", errors: ["Mobile number should not less than 11 digits"] },
+            ]);
+          } else {
+            form.setFields([{ name: "crn", errors: [] }]);
+            props.setState({ dob: data.date_of_birth });
+            setState({ _CRNDetails: data });
+            let sendOTPPayload = {
+              requestType: "SENDOTP",
+              emailId: "",
+              otpService: "SMS",
+              senderName: "",
+              otpType: "SU",
+              otpService: "EMAIL",
+            };
+            let mobilePhoneCode = data?.mobile_NO.slice(0, 1);
+            let mobileNo = data?.mobile_NO.slice(1, 12);
+            if (mobilePhoneCode === "1") {
+              //US mobile number check for 10 characters and country code check for 1
+              setState({ mobileNoInp: true });
+
+              sendOTPPayload = {
+                ...sendOTPPayload,
+                mobileNo: mobileNo,
+                mobilePhoneCode: mobilePhoneCode,
+              };
+              sendOTP(sendOTPPayload);
+            } else if (mobilePhoneCode === "9") {
+              let mobilePhoneCodeIn = data?.mobile_NO.slice(0, 2);
+              let mobileNoIn = data?.mobile_NO.slice(2, 13);
+              // console.log("EEEEE", mobileNoIn, mobilePhoneCodeIn);
+              sendOTPPayload = {
+                ...sendOTPPayload,
+                mobileNo: mobileNoIn,
+                mobilePhoneCode: mobilePhoneCodeIn,
+              };
+              sendOTP(sendOTPPayload);
+            } else {
+              form.setFields([{ name: "crn", errors: ["Mobile Number is not available"] }]);
+              setState({ mobileNoInp: false });
+              // form.setFieldsValue({
+              //   firstName: data.first_name,
+              //   middleName: data.middle_name,
+              //   lastName: data.last_name,
+              //   email: data.email_id,
+              //   dob: data.date_of_birth,
+              // });
+              // if (state.mobileNo && state.mobilePhoneCode) {
+              //   sendOTPPayload = {
+              //     ...sendOTPPayload,
+              //     mobileNo: state.mobileNo,
+              //     mobilePhoneCode: state.mobilePhoneCode,
+              //   };
+              //   sendOTP(sendOTPPayload);
+              // } else {
+              // form.setFields([
+              //   { name: "mobileCountryCode", errors: ["Select Phone Code"] },
+              //   { name: "mobileNo", errors: ["Enter Mobile Number"] },
+              // ]);
+              // }
+            }
+          }
+
+          // setState({ _CRNDetails: data });
+        } else {
+          form.setFieldsValue({ firstName: "", middleName: "", lastName: "", mobileNo: "" });
+          form.setFields([
+            {
+              name: "crn",
+              errors: [
+                data.errorMessage
+                  ? data.errorMessage
+                  : "Access restricted. Please reach us at click2remit@kotak.com or 02266053825 for more information",
+              ],
+            },
+          ]);
+        }
+      });
+    }
+  };
+  // const resendOTP = () => {
+  //   const payload = {
+  //     requestType: "RESENDOTP",
+  //     verificationToken: state._CRNOTPVerificationToken,
+  //     otpOption: "SM",
+  //   };
+
+  //   hookReSendOTP.sendRequest(payload, function (res) {
+  //     if (res.status == "S") {
+  //       notification.success({ message: res.message });
+  //       setState({ _CRNOTPVerificationToken: res.verificationToken });
+  //     }
+  //   });
+  // };
+  const sendOTP = (payload) => {
+    setLoader(true);
+    hookSendOtp.sendRequest(payload, function (data) {
+      setLoader(false);
+      if (data.status === "S") {
+        notification.success({ message: "OTP has been sent to your registered email address." });
+        setState({ _CRNOTPVerificationToken: data.verificationToken });
+        reverseTimerOnLoad();
+      } else {
+        notification.error({ message: data.errorMessage });
+      }
+    });
+  };
+  const verifyOTP = () => {
+    const payload = {
+      requestType: "VERIFYOTP",
+      otpType: "SU",
+      verificationToken: state._CRNOTPVerificationToken,
+      otp: state._OTPCode,
+    };
+    setLoader(true);
+    hookVerifyOTP.sendRequest(payload, function (res) {
+      setLoader(false);
+      if (res.status === "S") {
+        notification.success({ message: res.message });
+        let data = state._CRNDetails;
+        let mobilePhoneCode = data?.mobile_NO.slice(0, 1);
+        let mobileNo = data?.mobile_NO.slice(1, 12);
+        form.setFieldsValue({
+          crnOTP: "",
+          firstName: data.first_name,
+          middleName: data.middle_name,
+          lastName: data.last_name,
+          email: data.email_id,
+          dob: data.date_of_birth,
+        });
+        if (data.date_of_birth) {
+          setState({ pickerField: true });
+        }
+        if (mobilePhoneCode === "1") {
+          form.setFieldsValue({
+            mobileNo: mobileNo,
+            mobileCountryCode: mobilePhoneCode,
+          });
+        } else {
+          setState({ mobileNoInp: false });
+        }
+
+        setState({
+          gender: data.gender,
+          _CRNOTPVerificationToken: "",
+        });
+        props.setState({ dob: data.date_of_birth, proceedButtonBoolean: false });
+      } else {
+        form.setFieldsValue({
+          crnOTP: "",
+        });
+        notification.error({ message: res.errorMessage });
+        form.setFields([{ name: "crnOTP", errors: [res.errorMessage] }]);
+        let errors = [];
+        res.errorList.forEach((error, i) => {
+          let errorData = {
+            name: error.field,
+            errors: [error.error],
+          };
+          errors.push(errorData);
+        });
+        if (errors.length > 0) form.setFields(errors);
+      }
+    });
+  };
+
+  const getCoutryCodes = async () => {
+    if (AuthReducer.groupId === "XR") {
+      setState({
+        phoneCodes: [
+          { countryPhoneCode: 44, countryName: "United Kingdom" },
+          { countryPhoneCode: 91, countryName: "India" },
+        ],
+        selectPhoneCodes: true,
+      });
+    } else {
+      const payload = {
+        requestType: "COUNTRYPHONECODE",
+      };
+      // props.AddRecipientFormsetLoader(true);
+      setLoader(true);
+      hookGetCountryPhoneCodes.sendRequest(payload, function (data) {
+        setLoader(false);
+        if (data.status == "S") {
+          let _recvCountryCode = data.responseData.filter(
+            (item) => item.countryCode === AuthReducer.recvCountryCode,
+          );
+
+          setState({
+            // phoneCodes: data.responseData,
+            phoneCodes: [
+              { countryPhoneCode: 1, countryName: "United States" },
+              { countryPhoneCode: 91, countryName: "India" },
+            ],
+            selectPhoneCodes: false,
+            // mobileCountryCode: _recvCountryCode[0].countryPhoneCode,
+          });
+          // props.newForm1.setFieldsValue({
+          //   mobileCountryCode: _recvCountryCode[0].countryPhoneCode,
+          // });
+          props.setLoader(false);
+        }
+      });
+    }
+  };
+  const onClickResedOTP = async () => {
+    const optData = {
+      requestType: "RESENDOTP",
+      verificationToken: state._CRNOTPVerificationToken,
+      otpOption: "SM",
+      otpService: "EMAIL",
+    };
+
+    setLoader(true);
+    hookReSendOTP
+      .sendRequest(optData, function (res) {
+        setLoader(false);
+
+        if (res.status == "S") {
+          notification.success({ message: "OTP has been sent to your registered email address." });
+          props.setState({ verificationToken: res.verificationToken });
+          // setVerificationToken(decodeData.verificationToken);
+          clearInterval(intervalID);
+          setTimeout(() => {
+            reverseTimerOnLoad();
+          }, 200);
+        } else {
+          notification.error({ message: res.errorMessage });
+
+          let errors = [];
+          res.errorList.forEach((error, i) => {
+            let errorData = {
+              name: error.field,
+              errors: [error.error],
+            };
+            errors.push(errorData);
+          });
+          if (errors.length > 0) form.setFields(errors);
+        }
+      })
+      .catch((error) => {});
+  };
+  return (
+    <div class="col-md-8 col-sm-12 col-lg-8 mobile-order-2">
+      <Spinner spinning={loader}>
+        <div class="CR-account-form CR-otp-form">
+          <Form
+            form={form}
+            // initialValues={{
+            //   mobileCountryCode: "91",
+            // }}
+            onFinish={(values) => {
+              submitHandler(values);
+            }}
+          >
+            <>
+              <ul class="row">
+                <li class="col-md-12 col-sm-12 col-lg-12 ">
+                  <h4 class="text-black ">Personal details</h4>
+                </li>
+                <li class="col-md-12 col-sm-12 col-lg-12">
+                  <p class="text-left">
+                    Enter your personal details to create your new Click2Remit account.
+                  </p>
+                </li>
+                <li class="col-md-12 col-sm-12 col-lg-12">
+                  <Row>
+                    <Col md={!props?.state?.proceedButtonBoolean ? "12" : "8"}>
+                      <CustomInput
+                        showLabel={false}
+                        name="crn"
+                        label="CRN"
+                        validationRules={[
+                          // {
+                          //   min: 3,
+                          //   max: 10,
+                          //   message: "CRN Number should be min 3 and max 10 digits",
+                          // },
+                          {
+                            pattern: /^[0-9\b]+$/,
+                            message: "Only Numbers allowed",
+                          },
+                        ]}
+                        required
+                      >
+                        <FloatInput
+                          disabled={
+                            state._CRNOTPVerificationToken || !props.state.proceedButtonBoolean
+                          }
+                          onChange={(e) => {
+                            form.setFields([{ name: "crn", errors: [] }]);
+                            setState({ _CRNNumber: e.target.value, backBtn: false });
+                          }}
+                          type="text"
+                          placeholder="CRN"
+                        />
+                      </CustomInput>
+                    </Col>
+                    {props.state.proceedButtonBoolean && (
+                      <Col md="4">
+                        <button
+                          disabled={
+                            state.backBtn
+                              ? true
+                              : state._CRNOTPVerificationToken
+                              ? true
+                              : state._CRNNumber.length >= 1
+                              ? false
+                              : true
+                          }
+                          onClick={getCRNDetails}
+                          className="btn btn-sm btn-primary CR-primary-btn mb-3"
+                          type="button"
+                        >
+                          Get OTP
+                        </button>
+                      </Col>
+                    )}
+                  </Row>
+                </li>
+                {state._CRNOTPVerificationToken && (
+                  <li class="col-md-12 col-sm-12 col-lg-12">
+                    <Row>
+                      <Col md="8">
+                        <CustomInput
+                          showLabel={false}
+                          name="crnOTP"
+                          label="OTP Code"
+                          min={6}
+                          max={6}
+                          validationRules={[
+                            {
+                              pattern: /^[0-9\b]+$/,
+                              message: "Only Numbers allowed",
+                            },
+                          ]}
+                          required
+                        >
+                          <FloatInput
+                            onChange={(e) => {
+                              const regex = new RegExp(/^\d+$/);
+                              if (e.target.value.length === 6 && regex.test(e.target.value)) {
+                                setState({ _OTPCode: e.target.value, verifyOtpBtn: false });
+                              } else {
+                                setState({ _OTPCode: "", verifyOtpBtn: true });
+                              }
+                            }}
+                            placeholder="OTP Code"
+                          />
+                        </CustomInput>
+                        <a onClick={onClickResedOTP} className="resendotp">
+                          Resend OTP
+                        </a>
+                        <p className="mt-1">
+                          {reverseTimer.trim() == "" ? (
+                            <small>OTP expired.</small>
+                          ) : (
+                            <small>OTP will expire in {reverseTimer}</small>
+                          )}
+                        </p>
+                      </Col>
+                      <Col md="4">
+                        <button
+                          disabled={state.verifyOtpBtn}
+                          onClick={verifyOTP}
+                          className="btn btn-sm btn-primary CR-primary-btn mb-3"
+                          type="button"
+                        >
+                          Verify OTP
+                        </button>
+                      </Col>
+                    </Row>
+                  </li>
+                )}
+                <li class="col-md-12 col-sm-12 col-lg-12">
+                  {/* <div class="form-floating">
+                        <input type="text" class="form-control" id="floatingInput" />
+                        <label for="floatingInput">First name</label>
+                      </div> */}
+                  <CustomInput
+                    showLabel={false}
+                    name="firstName"
+                    label="First Name"
+                    validationRules={[
+                      ({ getFieldValue }) => ({
+                        validator(rule, value) {
+                          // validate space before and after string
+                          let startSpace = /^\s/;
+                          let endSpace = / $/;
+                          if (startSpace.test(value) || endSpace.test(value)) {
+                            return Promise.reject("Space not allow before and after first name.");
+                          }
+
+                          return Promise.resolve();
+                        },
+                      }),
+                      {
+                        pattern: /^[A-Za-z ]+$/,
+                        message: "Enter valid first name",
+                      },
+                    ]}
+                    min={2}
+                    max={60}
+                    required
+                  >
+                    <FloatInput placeholder="First name" disabled={false} />
+                  </CustomInput>
+                  {/* <FloatInput type="text" placeholder="First name" /> */}
+                </li>
+                <li class="col-md-12 col-sm-12 col-lg-12">
+                  <CustomInput
+                    showLabel={false}
+                    name="middleName"
+                    label="Middle Name"
+                    min={1}
+                    max={60}
+                    validationRules={[
+                      ({ getFieldValue }) => ({
+                        validator(rule, value) {
+                          // validate space before and after string
+                          let startSpace = /^\s/;
+                          let endSpace = / $/;
+                          if (startSpace.test(value) || endSpace.test(value)) {
+                            return Promise.reject("Space not allow before and after middle name.");
+                          }
+
+                          return Promise.resolve();
+                        },
+                      }),
+                      {
+                        pattern: /^[A-Za-z ]+$/,
+                        message: "Enter valid middle name",
+                      },
+                    ]}
+                  >
+                    <FloatInput type="text" placeholder="Middle name (optional)" disabled={false} />
+                  </CustomInput>
+                </li>
+                <li class="col-md-12 col-sm-12 col-lg-12">
+                  <CustomInput
+                    showLabel={false}
+                    name="lastName"
+                    label="Last Name"
+                    validationRules={[
+                      ({ getFieldValue }) => ({
+                        validator(rule, value) {
+                          // validate space before and after string
+                          let startSpace = /^\s/;
+                          let endSpace = / $/;
+                          if (startSpace.test(value) || endSpace.test(value)) {
+                            return Promise.reject("Space not allow before and after last name.");
+                          }
+
+                          return Promise.resolve();
+                        },
+                      }),
+                      {
+                        pattern: /^[A-Za-z ]+$/,
+                        message: "Enter valid last name",
+                      },
+                    ]}
+                    min={2}
+                    max={60}
+                    required
+                  >
+                    <FloatInput type="text" placeholder="Last name" disabled={false} />
+                  </CustomInput>
+                </li>
+                <li class="col-md-12 col-sm-12 col-lg-12">
+                  {/* <div class="form-floating">
+                        <input type="text" class="form-control" id="floatingInput" />
+                        <label for="floatingInput">Date of birth</label>
+                        <i class="dateicon"></i>
+                      </div> */}
+                  <CustomInput showLabel={false} label="Date of Birth" name="dob" required>
+                    {!state.pickerField ? (
+                      <FloatInput
+                        disabled={true}
+                        placeholder="Date of Birth"
+                        type="datepicker"
+                        defaultPickerValue={moment().subtract(18, "years")}
+                        disabledDate={(d) =>
+                          !d ||
+                          d.isAfter(moment().subtract(18, "years")) ||
+                          d.isSameOrBefore("1900-01-01")
+                        }
+                        onChange={(value, dateString) => {
+                          value !== null
+                            ? props.setState({ dob: dateString })
+                            : props.setState({ dob: "" });
+                        }}
+                      />
+                    ) : (
+                      <FloatInput
+                        type="text"
+                        onChange={() => {
+                          setState({ pickerField: false });
+                        }}
+                        placeholder="Enter Dob"
+                        disabled={false}
+                      />
+                    )}
+                    {/* <FloatInput type="text" placeholder="Enter Dob" disabled={true} /> */}
+                  </CustomInput>
+                </li>
+
+                <li class="col-md-12 col-sm-12 col-lg-12">
+                  <div className="row">
+                    <div className="col-12 col-md-5">
+                      <CustomInput
+                        showLabel={false}
+                        name="mobileCountryCode"
+                        label="Select Phone Code"
+                        required
+                      >
+                        <FloatInput
+                          type="select"
+                          placeholder="Select Phone Code"
+                          label="Phone Code"
+                          name="mobileCountryCode"
+                          // disabled={state.mobileNoInp}
+                          required
+                          //  size="small"
+                          showSearch
+                          // value={selectValue}
+                          onChange={(e) => {
+                            setState({ mobilePhoneCode: e });
+                          }}
+                        >
+                          {state.phoneCodes.map((phoneCode, i) => {
+                            return (
+                              <Option
+                                key={i}
+                                value={phoneCode.countryPhoneCode}
+                              >{`(${phoneCode.countryPhoneCode}) ${phoneCode.countryName}`}</Option>
+                            );
+                          })}
+                        </FloatInput>
+                      </CustomInput>
+                    </div>
+                    <div className="col-12 col-md-7">
+                      {/* <div class="form-floating">
+                        <select class="form-select input-flags">
+                          <option>None</option>
+                          <option value="1">One</option>
+                          <option value="2">Two</option>
+                          <option value="3">Three</option>
+                        </select>
+                        <label for="floatingInput">Date of birth</label>
+                      </div> */}
+                      <CustomInput
+                        showLabel={false}
+                        name="mobileNo"
+                        label="Mobile Number"
+                        validationRules={[
+                          {
+                            pattern: /^[1-9]\d*$/,
+                            message: "Mobile number should not start with 0",
+                          },
+                          ...inputValidations.mobileNumber(),
+                        ]}
+                        required
+                      >
+                        <FloatInput
+                          onChange={(e) => {
+                            setState({ mobileNo: e.target.value });
+                          }}
+                          // disabled={state.mobileNoInp}
+                          type="text"
+                          placeholder="Mobile Number"
+                        />
+                      </CustomInput>
+                    </div>
+                  </div>
+                </li>
+                <li class="col-md-12 col-sm-12 col-lg-12">
+                  <div className="row">
+                    <Form.Item
+                      className="form-item"
+                      name="readSmsNotify"
+                      valuePropName="checked"
+                      rules={[
+                        {
+                          validator: (_, value) =>
+                            value
+                              ? Promise.resolve()
+                              : Promise.reject(
+                                  new Error(
+                                    "Please confirm to receive sms notification on mobile number.",
+                                  ),
+                                ),
+                        },
+                      ]}
+                    >
+                      <Checkbox>
+                        I agree to receive SMS notifications on my registered mobile number.
+                      </Checkbox>
+                    </Form.Item>
+                  </div>
+                </li>
+                <li class="col-md-12 col-sm-12 col-lg-12">
+                  {/* <div class="form-floating">
+                        <input type="email" class="form-control" id="floatingInput" />
+                        <label for="floatingInput">Email address</label>
+                      </div> */}
+                  <CustomInput
+                    showLabel={false}
+                    name="email"
+                    validationRules={[
+                      ({ getFieldValue }) => ({
+                        validator(rule, value) {
+                          let message = "";
+                          let obj = validateEmailId(value ? value : "");
+                          message = obj.message;
+                          if (obj.status === "S") {
+                            return Promise.resolve();
+                          }
+                          return Promise.reject(message);
+                        },
+                      }),
+                    ]}
+                    label="Email address"
+                  >
+                    <FloatInput
+                      type="text"
+                      placeholder="Email address"
+                      //  disabled={true}
+                    />
+                  </CustomInput>
+                </li>
+
+                <li class="col-md-12 col-sm-12 col-lg-12">
+                  {/* <div class="form-floating">
+                  <select class="form-select" id="floatingSelect">
+                    <option selected>Select your secret question</option>
+                    <option value="1">One</option>
+                    <option value="2">Two</option>
+                    <option value="3">Three</option>
+                  </select>
+                </div> */}
+                  {/* <CustomInput showLabel={false} name="secretQuestion" label="Secret question" >
+                  <FloatInput class="form-select" type="select" placeholder="secret question" >
+                    <Option value="1">one</Option>
+                    <Option value="2">Two</Option>
+                    <Option value="3">Three</Option>
+                  </FloatInput>
+                </CustomInput> */}
+                </li>
+                <li class="col-md-12 col-sm-12 col-lg-12">
+                  {/* <div class="form-floating">
+                        <input type="text" class="form-control" id="floatingInput" />
+                        <label for="floatingInput">Answer to secret question</label>
+                      </div> */}
+                  {/* <CustomInput showLabel={false}
+                  name="secretQuestion"
+                  label="Answer to secret question"
+                  required>
+                  <FloatInput type="text" placeholder="Answer to secret question" />
+                </CustomInput> */}
+                </li>
+              </ul>
+              <div class="bottom_panel">
+                <div class="d-flex justify-content-between align-items-baseline">
+                  <a
+                    class="Back_arrow"
+                    onClick={() => {
+                      if (state._CRNOTPVerificationToken) {
+                        setState({ _CRNOTPVerificationToken: "", backBtn: true });
+                        form.setFieldsValue({ crn: "" });
+                      } else {
+                        navigate("/");
+                      }
+                    }}
+                  >
+                    <img src={BackArrow} alt="backArrow" />
+                    Back
+                  </a>
+                  <button
+                    // disabled={props.state.proceedButtonBoolean}
+                    htmlType="submit"
+                    className="btn btn-primary CR-primary-btn mb-3"
+                    style={{ width: "100px", margin: "0!important" }}
+                  >
+                    Proceed
+                  </button>
+                </div>
+              </div>
+            </>
+          </Form>
+        </div>
+      </Spinner>
+    </div>
+  );
+}
