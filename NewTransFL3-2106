@@ -1,0 +1,420 @@
+import { Link } from "react-router-dom";
+import React, { useState, Fragment, useEffect, useReducer } from "react";
+import {
+  Collapse,
+  Row,
+  Col,
+  Input,
+  Space,
+  Modal,
+  Radio,
+  Button,
+  Divider,
+  notification,
+  Select,
+  Form,
+} from "antd";
+// import GBp from "../../../../assets/images/Gbp.png";
+// import inr from "../../../../assets/images/inr.png";
+import moment from "moment";
+import { useDispatch, useSelector } from "react-redux";
+import { flags, getFlagPath } from "../../../../services/utility/flags";
+import useHttp from "../../../../hooks/useHttp";
+import { ReceiverAPI } from "../../../../apis/ReceiverAPI";
+import { Alert } from "@mui/material";
+import {
+  setRecvCountryCode,
+  setRecvCurrencyCode,
+  setSendCountryCode,
+  setSendCurrencyCode,
+} from "../../../../reducers/userReducer";
+import { getProcessingPartner } from "../../../../services/utility/group";
+const { Panel } = Collapse;
+const { Option } = Select;
+export default function NewTransaction(props) {
+  // const [formNewTransfer] = Form.useForm();
+  const { sendMoneyForm } = props;
+  const dispatch = useDispatch();
+  const AuthReducer = useSelector((state) => state.user);
+
+  const hookRecipientRequestLists = useHttp(ReceiverAPI.recipientRequestLists);
+
+  const [state, setState] = useReducer(
+    (state, newState) => ({ ...state, ...newState }),
+    {
+      recipientRequestLists: [],
+      amountError: false,
+    }
+  );
+
+  useEffect(() => {
+    // const timeOutId = setTimeout(() => {
+    if (props.state.sendAmount >= 1) {
+      console.log("props.state.sendAmount", props.state.sendAmount);
+      props.onCallComputeExchangeRates(
+        "SENDMONEY",
+        props.state.isDenefit,
+        props.state.promoCode,
+        props.state.sendAmount
+      );
+    } else {
+      //  alert('Please enter valid amount')
+      // setState({
+      //   amountError : true
+      // })
+    }
+    // }, 500);
+    // return () => clearTimeout(timeOutId);
+  }, [props.state.sendAmount]);
+
+  useEffect(() => {
+    sendMoneyForm.setFieldsValue({
+      transferOption: props.state.paymentOption,
+    });
+    recipientRequestListsHandler();
+  }, []);
+
+  const recipientRequestListsHandler = () => {
+    const payload = {
+      requestType: "RECREQLIST",
+      userId: AuthReducer.userID,
+      startIndex: "0",
+      recordsPerRequest: "",
+      search: "",
+      statusFlag: "",
+      favouriteFlag: "",
+    };
+    hookRecipientRequestLists.sendRequest(payload, (res) => {
+      console.log(res);
+      if (res.status === "S") {
+        setState({
+          recipientRequestLists: res.responseData,
+        });
+      }
+    });
+  };
+
+  //  console.log(AuthReducer)
+  const handleChangeSendCountry = (value, e) => {
+    console.log("value", value, e);
+    dispatch(setSendCountryCode(value));
+    dispatch(setSendCurrencyCode(e["data-currency"]));
+
+    // dispatch({ type: "SET_RECV_COUNTRY_CODE", payload: '' });
+    // dispatch({
+    //   type: "SET_RECV_CURRENCY_CODE",
+    //   payload: '',
+    // });
+  };
+
+  const handleChangeRecvCountry = (value, e) => {
+    dispatch(setRecvCountryCode(value));
+    dispatch(setRecvCurrencyCode(e["data-currency"]));
+  };
+  //  console.log(AuthReducer)
+
+  const handleChangeRadio = (data) => {
+    console.log("handleChangeRadio", data);
+    props.setState({ formObj: { ...props.state.formObj, paymentOptions: JSON.stringify(data) } });
+    if (data.target.value === "FER") {
+      props.setState({ isSelectedBankTransfer: true });
+    } else {
+      props.setState({ isSelectedBankTransfer: false });
+    }
+    props.setState({
+      programCode: data.target.value,
+      paymentOption: data.target.value,
+      selectedPaymentMethod: data.target.programName,
+      sendModeCode: data.target.sendModeCode,
+    });
+
+    props.getBankAccountLists(data.target.sendModeCode);
+  };
+  return (
+    <Fragment>
+      <div className="new-transaction">
+        {state.recipientRequestLists.length !== 0 && (
+          <Row className="py-2 align-items-center">
+            <Col span={16}>
+              {state.recipientRequestLists.map((v, i) => {
+                return (
+                  <Alert
+                    severity="info"
+                    className="mb-2"
+                    key={`request__list__${i}`}
+                  >
+                    You have new request form {v.recvFirstName} {v.recvLastName}{" "}
+                    - <Link to="/recipient-request-list">Click here</Link>
+                  </Alert>
+                );
+              })}
+            </Col>
+          </Row>
+        )}
+
+        <div className="row mb-3">
+          <div className="col-8 col-md-8">
+            <label className="form-label">You send</label>
+            <Input
+              type="number"
+              step="0.01"
+              min={0}
+              value={props.state.sendAmount}
+              onChange={(e) => {
+                props.setState({ sendAmount: e.target.value });
+                props.setState({ formObj: { ...state.formObj, sendAmount: e.target.value } });
+                if (e.target.value === "0" || e.target.value === "") {
+                  setState({
+                    amountError: true,
+                  });
+                } else {
+                  setState({
+                    amountError: false,
+                  });
+                }
+              }}
+              // onBlur={() =>
+              //   props.onCallComputeExchangeRates(
+              //     "SENDMONEY",
+              //     props.state.isDenefit,
+              //     props.state.promoCode,
+              //     props.state.sendAmount
+              //   )
+              // }
+            />
+            {state.amountError && (
+              <span role="alert" className="ant-form-item-explain-error">
+                Please enter valid amount
+              </span>
+            )}
+          </div>
+          <div className="col-4 col-md-4">
+            <div className="d-flex flag">
+              <Select
+                className="w-100 country-dropdown"
+                placeholder="Select Country "
+                defaultValue={AuthReducer.sendCountryCode}
+                value={AuthReducer.sendCountryCode}
+                onChange={handleChangeSendCountry}
+                disabled={true}
+              >
+                {props.state.sendCountryList.map((clist, i) => {
+                  return (
+                    <Option
+                      key={i}
+                      data-currency={clist.sendCurrency}
+                      value={clist.sendCountry}
+                    >
+                      <img
+                        src={getFlagPath(clist.sendCountry)}
+                        alt={clist.sendCountry}
+                        className="flag-img"
+                      />
+                      {`${clist.sendCurrency}`}
+                    </Option>
+                  );
+                })}
+              </Select>
+            </div>
+          </div>
+        </div>
+        <div className="row">
+          <div className="col-8 col-md-8">
+            {" "}
+            <label className="form-label">Reciever gets</label>
+            <Input
+              type="number"
+              step="0.01"
+              min={0}
+              readOnly={AuthReducer.groupId === "KCB" ? true : false}
+              value={props.state.recvAmount}
+              // onChange={(e) => props.setState({ recvAmount: e.target.value })}
+              onChange={(e) => {
+                props.setState({ recvAmount: e.target.value });
+                if (e.target.value === "0" || e.target.value === "") {
+                  setState({
+                    amountError: true,
+                  });
+                } else {
+                  setState({
+                    amountError: false,
+                  });
+                }
+              }}
+              onBlur={() =>
+                props.onCallComputeExchangeRates(
+                  "SENDMONEY",
+                  props.state.isDenefit,
+                  props.state.promoCode,
+                  props.state.recvAmount,
+                  "REVERSE"
+                )
+              }
+            />
+          </div>
+          <div className="col-4 col-md-4">
+            <div className="d-flex flag">
+              <Select
+                className="w-100 country-dropdown"
+                placeholder="Select Country "
+                defaultValue={AuthReducer.recvCountryCode}
+                value={AuthReducer.recvCountryCode}
+                onChange={handleChangeRecvCountry}
+              >
+                {props.state.receiverCountryLists.map((clist, i) => {
+                  return (
+                    <Option
+                      key={i}
+                      data-currency={clist.recvCurrency}
+                      value={clist.recvCountry}
+                    >
+                      <img
+                        src={getFlagPath(clist.recvCountry)}
+                        alt={clist.recvCountry}
+                        className="flag-img"
+                      />
+                      {`${clist.recvCurrency}`}
+                    </Option>
+                  );
+                })}
+              </Select>
+            </div>
+          </div>
+        </div>
+
+        <div className="row mt-3">
+          <div className="col-12 col-md-12">
+            <p className="mt-3 mt-md-0">
+              Exchange Rate:{" "}
+              <strong>
+                1 {AuthReducer.sendCurrencyCode} = {props.state.displayExRate}{" "}
+                {AuthReducer.recvCurrencyCode}
+              </strong>
+              <Button
+                disabled={props.state.recvAmount == 0}
+                onClick={() => props.setIsModalVisible(true)}
+                className="mt-1 btn-link text-center text-primary border-0"
+              >
+                View Breakup
+              </Button>
+            </p>
+          </div>
+        </div>
+        {getProcessingPartner(AuthReducer.sendCountryCode) !== "LULU" && (
+          <div>
+            <label className="form-label">Payment Options</label>
+            <Form.Item
+              className="form-item"
+              name="transferOption"
+              rules={[
+                {
+                  required: true,
+                  message: "Please select your transfer options.",
+                },
+              ]}
+            >
+              <Radio.Group
+                // value={'FER'}
+                onChange={handleChangeRadio}
+              >
+                <Space direction="vertical">
+                  {props.state.paymentOptions.map((clist, i) => {
+                    return (
+                      <Radio
+                        key={`po_${i}`}
+                        programName={clist.programName}
+                        sendModeCode={clist.sendModeCode}
+                        value={clist.programCode}
+                      >
+                        {clist.programName}
+                      </Radio>
+                    );
+                  })}
+                </Space>
+              </Radio.Group>
+            </Form.Item>
+          </div>
+        )}
+
+        <div className="px-4">
+          <Radio.Group name="radiogroup">
+            <Space direction="vertical">
+              {props.state.categoryPromoLists.map((cpl, i) => {
+                return (
+                  <Radio
+                    value={i}
+                    onClick={() => {
+                      props.setState({
+                        isDenefit: true,
+                        applyPromoCode: false,
+                        promoCode: cpl.promoCode,
+                      });
+                      setTimeout(() => {
+                        props.onCallComputeExchangeRates(
+                          "SENDMONEY",
+                          true,
+                          cpl.promoCode,
+                          props.state.sendAmount
+                        );
+                      }, 500);
+                    }}
+                  >
+                    {cpl.promoDesc}
+                  </Radio>
+                );
+              })}
+
+              {AuthReducer.groupId === "KCB" && (
+                <Radio
+                  value={10000}
+                  onClick={() => {
+                    props.setState({
+                      isDenefit: false,
+                      applyPromoCode: true,
+                      promoCode: "",
+                      promoValueWithDesc: "",
+                    });
+                    setTimeout(() => {
+                      props.onCallComputeExchangeRates(
+                        "SENDMONEY",
+                        false,
+                        "",
+                        props.state.sendAmount
+                      );
+                    }, 500);
+                  }}
+                >
+                  Apply promo code
+                </Radio>
+              )}
+            </Space>
+          </Radio.Group>
+        </div>
+        {props.state.applyPromoCode == true && (
+          <div className="row">
+            <div className="col-5">
+              <Input
+                placeholder="Enter promo code"
+                onChange={(e) => props.setState({ promoCode: e.target.value })}
+              />
+            </div>
+            <div className="col-5">
+              <button
+                className="btn btn-primary text-white"
+                disabled={props.state.promoCode == ""}
+                onClick={props.applyPromo}
+              >
+                Apply promo code
+              </button>
+            </div>
+          </div>
+        )}
+        {props.state.promoValueWithDesc != "" && (
+          <div className="col-12">
+            <p className="text-success">{props.state.promoValueWithDesc}</p>
+          </div>
+        )}
+      </div>
+    </Fragment>
+  );
+}
