@@ -1,0 +1,242 @@
+import React, { useState, useEffect } from "react";
+import {
+  Form,
+  Select,
+  Row,
+  Col,
+  Modal,
+  Radio,
+  Checkbox,
+  Space,
+  notification,
+  DatePicker,
+} from "antd";
+import { TransactionAPI } from "../../../../apis/TransactionAPI";
+import { encrypt, decrypt, publickey } from "../../../../helpers/makeHash";
+import { config } from "../../../../config";
+import moment from "moment";
+import useHttp from "../../../../hooks/useHttp";
+import CustomInput from "../../../../reusable/CustomInput";
+import { useSelector } from "react-redux";
+import { getProcessingPartner } from "../../../../services/utility/group";
+
+const { Option } = Select;
+
+export default function TransactionDetail(props) {
+  const { sendMoneyForm } = props;
+  const AuthReducer = useSelector((state) => state.user);
+  // const [isModalVisible, setIsModalVisible] = useState(false);
+  // const [isShowSubPurpose, setIsShowSubPurpose] = useState(false);
+
+  // const hookSubPurposeLists = useHttp(TransactionAPI.subPurposeLists);
+  // const hookAddPurposeDeclaration = useHttp(
+  //   TransactionAPI.addPurposeDeclaration
+  // );
+
+  useEffect(() => {
+    sendMoneyForm.setFieldsValue({
+      purpose: props.state.purposeName,
+      sourse: props.state.sourceOfFund,
+    });
+  }, []);
+
+  const handleChangePurpose = (purpose) => {
+    props.setState({ formObj: { ...props.state.formObj, purpose: purpose } });
+    let pur = JSON.parse(purpose);
+    if (getProcessingPartner(AuthReducer.sendCountryCode) === "LULU") {
+      props.setState({ purposeName: pur.name, purposeID: pur.code });
+    } else {
+      props.setState({
+        purposeName: pur.displayName,
+        purposeID: pur.purposeId,
+      });
+    }
+  };
+
+  // const handleChangeSubPurpose = (subpurpose) => {
+  //   let pur = JSON.parse(subpurpose);
+  //   props.setState({
+  //     subPurposeName: pur.displayName,
+  //     subPurposeID: pur.subPurposeId,
+  //   });
+  // };
+
+  const handleChangeSourse = (sourse) => {
+    props.setState({ formObj: { ...props.state.formObj, source: sourse } });
+    let _selectedSOF = JSON.parse(sourse);
+    if (getProcessingPartner(AuthReducer.sendCountryCode) === "LULU") {
+      props.setState({
+        sourceFundId: _selectedSOF.code,
+        sourceOfFund: _selectedSOF.name,
+      });
+    } else {
+      props.setState({
+        sourceFundId: _selectedSOF.sourceFundId,
+        sourceOfFund: _selectedSOF.sourceOfFund,
+      });
+    }
+  };
+
+  // const onFinishBookTransaction = () => {
+  //   props.setState({
+  //     isStep: 4,
+  //     pageName: "TXNREVIEW",
+  //   });
+
+  //   setTimeout(() => {
+  //     props.onCallComputeExchangeRates(
+  //       "TXNREVIEW",
+  //       props.state.isDenefit,
+  //       props.state.promoCode,
+  //       props.state.sendAmount
+  //     );
+  //   }, 500);
+  // };
+
+  // const onFinishDeclartion = (value) => {
+  //   const payload = {
+  //     requestType: "ADDPURPOSEDECLARATION",
+  //     borrower: "",
+  //     declarationDate: "2022-01-25",
+  //     immovableProperty: value.immovableProperty,
+  //     isDeclarationChk: "Y",
+  //     isImmovablePropertyChk: "Y",
+  //     isLoanConfirm: "",
+  //     isNRIAccount: value.isNRIAccount,
+  //     purposeId: props.state.purposeID,
+  //     rgtn: "",
+  //     ulid: "128676",
+  //     userId: props.state.userID,
+  //   };
+
+  //   hookAddPurposeDeclaration.sendRequest(payload, function (data) {
+  //     if (data.status == "S") {
+  //       // setState({ subPurposeLists: data.responseData })
+  //       notification.success({ message: data.message });
+  //       // setIsModalVisible(false);
+  //     } else {
+  //       notification.error({ message: data.errorMessage });
+  //     }
+  //   });
+  // };
+
+  return (
+    <div>
+      <div className="row">
+        <div className="col-12 col-md-6">
+          <label className="form-label">Purpose For Transfer</label>
+          <br />
+          <CustomInput
+            className="form-item"
+            name="purpose"
+            type="select"
+            label="Purpose For Transfer"
+            showLabel={false}
+            onChange={handleChangePurpose}
+            placeholder="Purpose For Transfer"
+            required
+          >
+            {props.state.purposeLists.map((purpose, i) => {
+              return (
+                <Option key={i} value={JSON.stringify(purpose)}>
+                  {getProcessingPartner(AuthReducer.sendCountryCode) === "LULU"
+                    ? purpose.name
+                    : purpose.displayName}
+                </Option>
+              );
+            })}
+          </CustomInput>
+        </div>
+        {(props.state.isSelectedBankTransfer ||
+          getProcessingPartner(AuthReducer.sendCountryCode) === "LULU") && (
+          <div className="col-12 col-md-6">
+            <label className="form-label">Select Source of Fund</label>
+            <br />
+            <CustomInput
+              className="form-item"
+              name="sourse"
+              type="select"
+              label="Select Sourse of Fund"
+              showLabel={false}
+              onChange={handleChangeSourse}
+              placeholder="Select source"
+              required
+            >
+              {props.state.sourceOFFundLists.map((sList, i) => {
+                return (
+                  <Option key={i} value={JSON.stringify(sList)}>
+                    {getProcessingPartner(AuthReducer.sendCountryCode) ===
+                    "LULU"
+                      ? sList.name
+                      : sList.sourceOfFund}
+                  </Option>
+                );
+              })}
+            </CustomInput>
+          </div>
+        )}
+      </div>
+
+      {props.state.groupId == "ICA" && props.state.isSelectedBankTransfer && (
+        <>
+          <Row justify="space-between">
+            <Col span={10} className="py-2">
+              <Form.Item
+                className="form-item"
+                name="send_type"
+                rules={[
+                  { required: true, message: "Please select schedule type." },
+                ]}
+              >
+                <Radio.Group name="scheduleType" value={1}>
+                  <Space direction="vertical">
+                    <Radio
+                      value={1}
+                      onClick={() => {
+                        props.setState({ _isScheduleTransaction: false });
+                      }}
+                    >
+                      Send Now
+                    </Radio>
+
+                    <Radio
+                      value={2}
+                      onClick={() => {
+                        props.setState({ _isScheduleTransaction: true });
+                      }}
+                    >
+                      Send Later
+                    </Radio>
+                  </Space>
+                </Radio.Group>
+              </Form.Item>
+            </Col>
+          </Row>
+          {props.state._isScheduleTransaction == true && (
+            <Row justify="space-between">
+              <Col span={10} className="py-2">
+                <Form.Item
+                  className="form-item"
+                  name="estimate_date"
+                  rules={[{ required: true, message: "Please select date." }]}
+                >
+                  <DatePicker
+                    className="w-100"
+                    placeholder="Start date"
+                    onChange={(value, dateString) => {
+                      value !== null
+                        ? props.setState({
+                            scheduleTransactionDate: dateString,
+                          })
+                        : props.setState({ scheduleTransactionDate: "" });
+                    }}
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
