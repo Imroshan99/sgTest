@@ -1,0 +1,2 @@
+      comments: window.btoa(value.feedbackDesc.trim().replace("'", "")),
+    <Main sidebar={AuthReducer.isLoggedIn ? location?.state?.sidebar: ""}>
