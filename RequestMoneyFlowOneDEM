@@ -1,0 +1,1812 @@
+import React, { useState, useEffect, useReducer } from "react";
+import { Row, Col } from "react-bootstrap";
+import Swal from "sweetalert2";
+import { useDispatch, useSelector } from "react-redux";
+import { inputValidations } from "../../../../services/validations/validations";
+import Spinner from "../../../../reusable/Spinner";
+import { Form, Input, Tabs, Select, notification, Radio, AutoComplete } from "antd";
+import { GuestAPI } from "../../../../apis/GuestAPI";
+import { ReceiverAPI } from "../../../../apis/ReceiverAPI";
+import useHttp from "../../../../hooks/useHttp";
+import { Link } from "react-router-dom";
+import logorefresh from "../../../../assets/images/svg/refreshCaptcha.svg";
+import { COUNTRY } from "../../../../services/Country";
+
+const { TabPane } = Tabs;
+const { Option } = Select;
+function RequestMoneyFlowOne() {
+  const [form] = Form.useForm();
+  const AuthReducer = useSelector((state) => state.user);
+  // console.log(AuthReducer);
+  const [loading, setLoader] = useState(false);
+  const [captchaID, setCaptchaID] = useState();
+  const [captchaImg, setCaptchaImg] = useState();
+
+  const [state, setState] = useReducer((state, newState) => ({ ...state, ...newState }), {
+    clientId: AuthReducer.clientId,
+    groupId: AuthReducer.groupId,
+    twofa: AuthReducer.twofa,
+    sessionId: AuthReducer.sessionId,
+    userID: AuthReducer.userID,
+    userFullName: AuthReducer.userFullName,
+
+    phoneCodes: [],
+    deliveryOptionsList: [],
+    deliveryOption: "DC",
+
+    bankNames: [],
+    isSameBank: "N",
+    bankBranchStates: [],
+    bankBranchCities: [],
+    bankBranchNames: [],
+    accountTypes: [],
+    recvCountryList: [],
+    bankBranchCode: "",
+
+    updateBankBranch: "",
+    updateBankCity: "",
+    updateBankState: "",
+    updateBankCode: "",
+    bankName: "",
+
+    bankBranch: "",
+    bankCity: "",
+    bankState: "",
+    bankCode: "",
+    ifscCodeRadio: true,
+    branchLists: [],
+    sendCountryList: [],
+    sendCountryCode: "",
+    sendCurrencyCode: "",
+    recvCountryCode: "",
+    recvCurrencyCode: "",
+  });
+
+  const hookGetCountryPhoenCodes = useHttp(GuestAPI.getCountryPhoneCodes);
+  const hookGetDeliveryOptions = useHttp(GuestAPI.getDeliveryOptions);
+  const hookGetBankList = useHttp(GuestAPI.getBankListData);
+  const hookGetBankBranchState = useHttp(GuestAPI.getBankBranchState);
+  const hookGetBankBranchCity = useHttp(GuestAPI.getBankBranchCity);
+  const hookGetBankBranchNames = useHttp(GuestAPI.getBankBranchNames);
+  const hookRequestMoney = useHttp(ReceiverAPI.requestMoney);
+  const hookRecvCountryList = useHttp(GuestAPI.receiverCountryList);
+  const hookGetBankBranchData = useHttp(GuestAPI.bankBranchData);
+  const hookGetBankStateCities = useHttp(ReceiverAPI.bankStateCities);
+  const hookGebankBranches = useHttp(ReceiverAPI.bankBranches);
+  const hookgetCaptcha = useHttp(GuestAPI.getCaptcha);
+  const hookVerifyCaptcha = useHttp(GuestAPI.verifyCaptcha);
+  const hookGetUserCountryList = useHttp(GuestAPI.countryList);
+  const hookGetReceiverCountryLists = useHttp(GuestAPI.receiverCountryList);
+
+  useEffect(() => {
+    getCaptcha();
+    if (state.sendCountryList.length === 0) {
+      getSendCountryList();
+    }
+    if (state.phoneCodes.length === 0) {
+      getCoutryCodes();
+    }
+    if (state.recvCountryCode) {
+      getDeliveryOptions();
+      getBankList();
+      getStateLists();
+    }
+    // onChangeBankBranchState("");
+    // onChangeBankBranchCity("");
+
+    // form.setFieldsValue({
+    //   mobileCountryCode: state.sendCurrencyCode === "GBP" ? "44" : "1",
+    //   country: state.sendCurrencyCode === "GBP" ? "NP" : "GB",
+    // });
+  }, [state.recvCountryCode]);
+
+  useEffect(() => {
+    form.setFieldsValue({
+      bankName: "",
+      bankBranchState: "",
+      bankBranchCity: "",
+      bankBranchName: "",
+      ifscCode: "",
+    });
+  }, [state.ifscCodeRadio]);
+
+  const getCaptcha = () => {
+    let payload = {
+      requestType: "GETCAPTCHA",
+    };
+    setLoader(true);
+    hookgetCaptcha.sendRequest(payload, function (data) {
+      setLoader(false);
+      if (data.status == "S") {
+        setCaptchaID(data.id);
+        setCaptchaImg(data.captchaImage);
+      } else {
+        notification.error({ message: data.errorMessage });
+      }
+    });
+  };
+
+  const getSendCountryList = () => {
+    const dataCountry = {
+      requestType: "SENDCOUNTRYLIST",
+    };
+    setLoader(true);
+    hookGetUserCountryList.sendRequest(dataCountry, function (data) {
+      setLoader(false);
+      if (data.status === "S") {
+        setState({ sendCountryList: data.responseData });
+      }
+    });
+  };
+
+  const getStateLists = async () => {
+    let payload = {
+      requestType: "STATELIST",
+      countryCode: state.recvCountryCode,
+      keyword: "",
+    };
+    setLoader(true);
+    hookGetBankBranchState.sendRequest(payload, function (data) {
+      setLoader(false);
+      if (data.status === "S") {
+        setState({ bankBranchStates: data.responseData });
+        // props.setLoader(false);
+      }
+    });
+  };
+
+  // const recvCountryList = async () => {
+  //   const payload = {
+  //     requestType: "RECVCOUNTRYLIST",
+  //     sendCountry: AuthReducer.recvCountryCode,
+  //     sendCurrency: AuthReducer.recvCurrencyCode,
+  //   };
+
+  //   hookRecvCountryList.sendRequest(payload, function (data) {
+  //     if (data.status === "S") {
+  //       setState({ recvCountryList: data.responseData });
+  //     }
+  //   });
+  // };
+
+  const getCoutryCodes = async () => {
+    const payloadGetCoutryCodes = {
+      requestType: "COUNTRYPHONECODE",
+    };
+    setLoader(true);
+    hookGetCountryPhoenCodes.sendRequest(payloadGetCoutryCodes, function (data) {
+      setLoader(false);
+      if (data.status === "S") {
+        const dataPhoneCodes = data?.responseData;
+        // dataPhoneCodes.sort(dynamicSort("countryName", "number"));
+        // console.log("dataPhoneCodesSorted", dataPhoneCodes);
+        setState({ phoneCodes: dataPhoneCodes });
+      }
+    });
+  };
+
+  const getDeliveryOptions = async () => {
+    const payload = {
+      requestType: "RECVMODE",
+      countryCode: state.recvCountryCode,
+    };
+    setLoader(true);
+    hookGetDeliveryOptions.sendRequest(payload, function (res) {
+      setLoader(false);
+      if (res.status === "S") {
+        setState({ deliveryOptionsList: res.responseData });
+      }
+    });
+  };
+
+  const getBankList = async () => {
+    const payload = {
+      requestType: "BANKLIST",
+      countryCode: state.recvCountryCode,
+    };
+    setLoader(true);
+    hookGetBankList.sendRequest(payload, function (res) {
+      setLoader(false);
+      if (res.status === "S") {
+        setState({ bankNames: res.responseData });
+      } else {
+        setState({ bankNames: [] });
+      }
+    });
+  };
+
+  const onChangeBankBranchState = async (row) => {
+    if (state.recvCountryCode === "NP") {
+      const bankName = row.value;
+      let bankCode = row?.label?.props?.bankCode;
+      let isSameBank = row?.label?.props?.isSameBank;
+      setState({
+        bankName: bankName,
+        bankCode: bankCode,
+        isSameBank: isSameBank,
+      });
+      // form1.setFieldsValue({ cityName: undefined, branch: undefined });
+      const payload = {
+        requestType: "BankStateCities",
+        countryCode: state.recvCountryCode,
+        state: "",
+        bankName: bankName,
+        search: "",
+      };
+      setLoader(true);
+      hookGetBankStateCities.sendRequest(payload, function (data) {
+        setLoader(false);
+        if (data.status === "S") {
+          setState({
+            cityLists: data.responseData,
+          });
+        }
+      });
+    } else {
+      setState({ bankName: row.value });
+    }
+  };
+
+  const onChangeBankBranchCity = async (stateCode) => {
+    const payload = {
+      requestType: "CITILIST",
+      countryCode: state.recvCountryCode,
+      stateCode: stateCode,
+    };
+    setLoader(true);
+    hookGetBankBranchCity.sendRequest(payload, (res) => {
+      setLoader(false);
+      if (res.status === "S") {
+        // setState({ bankBranchCities: res.responseData });
+      }
+    });
+  };
+
+  const onChangeBankBranchName = async (cityCode) => {
+    const payload = {
+      requestType: "BANKBRANCHES",
+      countryCode: state.recvCountryCode,
+      bankCode: state.bankCode,
+      bankName: state.bankName,
+      cityCode: "",
+      stateCode: "",
+      city: cityCode,
+      keyword: "",
+    };
+    setLoader(true);
+    hookGebankBranches.sendRequest(payload, function (data) {
+      setLoader(false);
+      if (data.status === "S") {
+        setState({
+          branchLists: data.responseData,
+        });
+      }
+    });
+  };
+
+  const onChangeBankBranchNameSelect = (value) => {
+    const details = JSON.parse(value);
+    form.setFieldsValue({
+      branchCode: details.branchCode,
+    });
+  };
+
+  const onChangeDeliveryOptionHandler = (value) => {
+    setState({
+      deliveryOption: value,
+    });
+  };
+
+  const onChangeIfscCodeHandler = (e) => {
+    if (e.target.value.length == 11) {
+      // props.setLoader(true);state
+      const payload = {
+        requestType: "BANKBRANCHDATA",
+        branchCode: e.target.value,
+      };
+      setLoader(true);
+      hookGetBankBranchData.sendRequest(payload, function (data) {
+        setLoader(false);
+        // props.setIfscCodeValidator(data);
+        if (data.status == "S") {
+          form.setFieldsValue({
+            bankName: data.bankName,
+            bankBranchCity: data.bankCity,
+            bankBranchState: data.bankState,
+            bankBranchName: data.branchName,
+          });
+
+          // props.setLoader(false);
+          notification.success({ message: data.message });
+          // setShowIfscAddress(true);
+          // props.setIfscBranchName(data);
+          // setIfscAddress(data.bankAddress);
+          setState({
+            branch: data,
+            bankCode: data.branchCode,
+            bankBranch: data.branchName,
+            bankAddress: data.bankAddress,
+            bankState: data.bankState,
+            bankCity: data.bankCity,
+            bankName: data.bankName,
+            bankId: data.bankId,
+            bankCountry: data.bankCountry,
+          });
+        } else {
+          form.setFieldsValue({
+            bankName: "",
+            cityName: "",
+            bankState: "",
+            branch: "",
+          });
+          // notification.error({ message: res.data.errorMessage });
+          // setShowIfscAddress(false);
+          form.setFields([{ name: "ifscCode", errors: [data.errorMessage] }]);
+          setState({
+            branch: "",
+            branchCode: "",
+            bankBranch: "",
+            bankAddress: "",
+            bankState: "",
+            bankCity: "",
+            bankName: "",
+            bankId: "",
+            bankCountry: "",
+          });
+        }
+      });
+    } else {
+      setState({
+        branch: "",
+        branchCode: "",
+        bankBranch: "",
+        bankAddress: "",
+        bankState: "",
+        bankCity: "",
+        bankName: "",
+        bankId: "",
+        bankCountry: "",
+      });
+    }
+  };
+
+  const getReceiverCountryLists = (e) => {
+    const payload = {
+      requestType: "RECVCOUNTRYLIST",
+      sendCountry: e,
+      // sendCurrency: "USD",
+      sendCurrency: COUNTRY['IN'].countryCurrency,
+    };
+
+    setLoader(true);
+    hookGetReceiverCountryLists.sendRequest(payload, function (data) {
+      setLoader(false);
+      if (data.status === "S") {
+        setState({ recvCountryList: data.responseData });
+      }
+    });
+  };
+
+  const onChangeCurrency = (val) => {
+    // debugger;
+    console.log("RRRR val", val);
+    console.log("RRRR cccval", COUNTRY);
+    setState({
+      sendCurrencyCode: COUNTRY[val].countryCurrency,
+      sendCountryCode: COUNTRY[val].countryCode,
+      deliveryOption: "",
+      bankName: "",
+    });
+    const countryData = state.phoneCodes.filter((item) => {
+      return item.countryCode === val;
+    });
+    form.setFieldsValue({
+      mobileCountryCode: countryData[0].countryPhoneCode,
+      country: "",
+      receiverCountry: "",
+      deliveryOption: "",
+    });
+    getReceiverCountryLists(val);
+  };
+
+  const onChangeReceiverCountry = (val) => {
+    form.setFieldsValue({ country: val, deliveryOption: "" });
+    setState({
+      recvCountryCode: COUNTRY[val].countryCode,
+      // recvCurrencyCode: "NPR",
+      recvCurrencyCode: COUNTRY[val].countryCurrency,
+      deliveryOption: "",
+      bankName: "",
+    });
+  };
+
+  const onChangeState = async (stateCode) => {
+    const payload = {
+      requestType: "CITILIST",
+      countryCode: state.recvCountryCode,
+      stateCode: stateCode,
+    };
+    setLoader(true);
+    hookGetBankBranchCity.sendRequest(payload, (res) => {
+      setLoader(false);
+      if (res.status === "S") {
+        setState({ bankBranchCities: res.responseData });
+      }
+    });
+  };
+
+  const onFinish = async (value) => {
+    let captchaPayload = {
+      requestType: "VERIFYCAPTCHA",
+      id: captchaID,
+      captchaResponse: value.captcha,
+      emailId: value.emailID,
+    };
+    setLoader(true);
+    hookVerifyCaptcha.sendRequest(captchaPayload, function (data) {
+      setLoader(false);
+      if (data.status == "S") {
+        let randomDigits = Math.floor(1000 + Math.random() * 9000);
+        let bankPayload = {};
+
+        // if (state.recvCountryCode !== "NP") {
+        //   if (state.recvCountryCode === "BD" || state.recvCountryCode === "PH") {
+        //     bankPayload.swiftCode = value.bankCode;
+        //   }
+        //   bankPayload.accountType = "S";
+        //   bankPayload.bankName = state.bankName;
+        //   bankPayload.bankCode = value.bankCode;
+        //   bankPayload.branchCode = state.recvCountryCode === "PH" ? "000000" : value.branchCode;
+        //   bankPayload.bankBranch = state.bankName;
+        //   bankPayload.bankAddress = value.bankAddress;
+        //   bankPayload.bankState = state.recvCountryCode;
+        //   bankPayload.bankCity = state.recvCountryCode;
+        // }
+        let recvPayload = {
+          requestType: "REQRECIPIENT",
+          nickName: `${value.nickName}${randomDigits}`,
+          recvFirstName: value.firstName,
+          recvMiddleName: "",
+          recvLastName: value.lastName,
+          dob: "",
+          receiverType: "INDIVIDUAL",
+          accountNo: value.accountNo,
+          relationship: "SELF",
+          gender: "M",
+          address1: value.address1.trim(),
+          address2: value.address1.trim(),
+          state: value.state,
+          stateOther: "",
+          city: value.city,
+          cityOther: "",
+          zipcode: value.zipCode,
+          emailId: "",
+          mobileCountryCode: value.mobileCountryCode,
+          mobileNo: value.mobileNumber,
+          altPhone: value.phoneNumber,
+          fax: "",
+          recvModeCode: "AC", //bypass
+          // recvModeCode: value.deliveryOption,
+          accountHolderName: value.senderFirstName + " " + value.senderLastName,
+
+          // bankBranch:
+          //   state.recvCountryCode === "NP"
+          //     ? state.ifscCodeRadio
+          //       ? state.bankBranch
+          //       : JSON.parse(value.bankBranchName).branchName
+          //     : value.bankSortCode,
+
+          // bankCity:
+          //   state.recvCountryCode === "NP"
+          //     ? state.ifscCodeRadio
+          //       ? state.bankCity
+          //       : value.bankBranchCity
+          //     : state.recvCountryCode,
+          // bankState:
+          //   state.recvCountryCode === "NP"
+          //     ? state.ifscCodeRadio
+          //       ? state.bankState
+          //       : value.bankBranchState
+          //     : state.recvCountryCode,
+          bankCode : value.bankCode,
+          isSameBank: state.isSameBank,
+
+          // accountType: value.accountType,
+          accountType: "S",
+          bankName: state.bankName === "" ? value.bankName : state.bankName,
+          purpose: "SAVINGS",
+          purposeCode: "P1301",
+          remark: "",
+
+          nearestLogisticCity: "",
+          sendAmount: value.amount,
+          sendCountryCode: state.sendCountryCode,
+          sendCurrencyCode: state.sendCurrencyCode,
+          sendFirstName: value.senderFirstName,
+          sendLastName: value.senderLastName,
+          sendMobilePhoneCode: value.mobileCountryCode,
+          sendMobileNo: value.senderMobileNumber,
+          countryCode: state.recvCountryCode,
+          currencyCode: state.recvCurrencyCode,
+          uniqueIdentifierType: "",
+          uniqueIdentifierValue: "",
+          senderLoginid: value.senderEmailID,
+          recvLoginid: value.emailID,
+
+          ...bankPayload,
+        };
+
+        setLoader(true);
+        hookRequestMoney.sendRequest(recvPayload, (res) => {
+          setLoader(false);
+          if (res.status == "S") {
+            Swal.fire({
+              title: "Success",
+              text: "Request submitted successfully",
+              icon: "success",
+              confirmButtonColor: "#2dbe60",
+              allowOutsideClick: false,
+            }).then((result) => {
+              if (result.isConfirmed) {
+                // navigate('/signin');
+                window.location.href = "/";
+              }
+            });
+          } else {
+            getCaptcha();
+            notification.error({ message: res.errorMessage });
+            let errors = [];
+            res.errorList.forEach((error, i) => {
+              let errorData = {
+                name: error.field,
+                errors: [error.error],
+              };
+              errors.push(errorData);
+            });
+            if (errors.length > 0) form.setFields(errors);
+          }
+        });
+      } else {
+        form.setFieldsValue({ captcha: "" });
+        form.setFields([{ name: "captcha", errors: ["Incorrect Captcha"] }]);
+        getCaptcha();
+      }
+    });
+  };
+
+  const onFailed = ({ errorFields }) => {
+    form.scrollToField(errorFields[0].name);
+  };
+  return (
+    <>
+      <Spinner spinning={loading} size="large" autoComplete="none">
+      <div className="template2__main">
+        <div className="sendmoney__page preloginform">
+          <div className="container">
+            <div>
+              <Row className="justify-content-center ">
+                {/* <div className={styles.bodyColor}>sdfsd</div> */}
+                <Col lg={12} md={12}>
+                  <div className="mb-4">
+                    {/* <TestDemo/> */}
+                    <Form
+                      className="request_money_page_form"
+                      form={form}
+                      onFinish={onFinish}
+                      onFinishFailed={onFailed}
+                      initialValues={
+                        {
+                          // currency: "GB",
+                          // mobileCountryCode: "44",
+                          // country: "NP",
+                        }
+                      }
+                    >
+                      <Row className="justify-content-center">
+                        <Col md={12}>
+                          <Row className="justify-content-start">
+                            <Col md={12}>
+                              <h4 className="mb-3  ">
+                                Sender &amp; Transaction Details
+                                {/* {hookGetCountryPhoenCodes.isLoading
+                            ? "true"
+                            : "false"} */}
+                              </h4>
+                            </Col>
+                            <Col md={12}>
+                              <Row className="justify-content-start">
+                                <Col md={3}>
+                                  <label className="form-label">Amount</label>
+                                  <Form.Item
+                                    className="form-item"
+                                    name="amount"
+                                    rules={[
+                                      {
+                                        required: true,
+                                        message: "Enter Amount.",
+                                      },
+                                      {
+                                        min: 1,
+                                        max: 6,
+                                        message: "Enter Amount between 1 and 6 character.",
+                                      },
+                                      {
+                                        pattern: /^[1-9][0-9]*$/,
+                                        message: "Please enter valid amount",
+                                      },
+                                    ]}
+                                  >
+                                    <Input
+                                      size="large"
+                                      autoComplete="none"
+                                      placeholder="Enter Amount"
+                                    />
+                                  </Form.Item>
+                                </Col>
+                                <Col md={2}>
+                                  <label className="form-label">Currency</label>
+                                  <Form.Item
+                                    className="form-item"
+                                    name="currency"
+                                    rules={[
+                                      {
+                                        required: true,
+                                        message: "Please select Currency",
+                                      },
+                                    ]}
+                                  >
+                                    <Select
+                                      onChange={onChangeCurrency}
+                                      showSearch
+                                      className="w-100"
+                                      placeholder="Select Currency"
+                                      size="large"
+                                      autoComplete="none"
+                                    >
+                                      {/* <Option
+                                        key="ac1"
+                                        value={AuthReducer.sendCurrencyCode}
+                                      >
+                                        {AuthReducer.sendCurrencyCode}
+                                      </Option> */}
+                                      {state.sendCountryList.map((clist, i) => {
+                                        return (
+                                          <Option
+                                            key={i}
+                                            value={clist.sendCountry}
+                                          >{`${clist.sendCurrency}`}</Option>
+                                        );
+                                      })}
+                                    </Select>
+                                  </Form.Item>
+                                </Col>
+                              </Row>
+                            </Col>
+
+                            <Col md={12}>
+                              <Row className="justify-content-center">
+                                <Col md={3}>
+                                  <label className="form-label">Sender First Name</label>
+                                  <Form.Item
+                                    className="form-item"
+                                    name="senderFirstName"
+                                    rules={[
+                                      {
+                                        required: true,
+                                        message: "Enter Sender First Name.",
+                                      },
+                                      {
+                                        min: 3,
+                                        message:
+                                          "First Name should be between 3 and 40 characters long",
+                                      },
+                                      {
+                                        max: 40,
+                                        message:
+                                          "First Name should be between 3 and 40 characters long",
+                                      },
+                                      {
+                                        pattern: /^[a-zA-Z]+$/,
+                                        message: "Please enter valid first name",
+                                      },
+                                    ]}
+                                  >
+                                    <Input
+                                      size="large"
+                                      autoComplete="none"
+                                      placeholder="Sender First Name"
+                                    />
+                                  </Form.Item>
+                                </Col>
+
+                                <Col md={3}>
+                                  <label className="form-label">Sender Last Name</label>
+                                  <Form.Item
+                                    className="form-item"
+                                    name="senderLastName"
+                                    rules={[
+                                      {
+                                        required: true,
+                                        message: "Enter Sender Last Name.",
+                                      },
+                                      {
+                                        min: 3,
+                                        message:
+                                          "Last Name should be between 3 and 40 characters long",
+                                      },
+                                      {
+                                        max: 40,
+                                        message:
+                                          "Last Name should be between 3 and 40 characters long",
+                                      },
+                                      {
+                                        pattern: /^[a-zA-Z]+$/,
+                                        message: "Please enter valid last name",
+                                      },
+                                    ]}
+                                  >
+                                    <Input
+                                      size="large"
+                                      autoComplete="none"
+                                      placeholder="Sender Last Name"
+                                    />
+                                  </Form.Item>
+                                </Col>
+                                <Col md={2}>
+                                  <label className="form-label">Country Code</label>
+                                  <Form.Item
+                                    className="form-item"
+                                    name="mobileCountryCode"
+                                    rules={[
+                                      {
+                                        required: true,
+                                        message: "Please select your Country Code.",
+                                      },
+                                    ]}
+                                  >
+                                    <Select
+                                      disabled
+                                      size="large"
+                                      autoComplete="none"
+                                      className="w-100"
+                                      placeholder="Select Country Code"
+                                      showSearch
+                                      filterOption={(input, option) =>
+                                        (option?.children ?? "")
+                                          .toLowerCase()
+                                          .includes(input.toLowerCase())
+                                      }
+                                    >
+                                      {state.phoneCodes.map((phoneCode, i) => {
+                                        return (
+                                          <Option
+                                            key={i}
+                                            value={phoneCode.countryPhoneCode}
+                                          >{`(${phoneCode.countryPhoneCode}) ${phoneCode.countryName}`}</Option>
+                                        );
+                                      })}
+                                    </Select>
+                                  </Form.Item>
+                                </Col>
+                                <Col md={2}>
+                                  <label className="form-label">Mobile Number</label>
+                                  <Form.Item
+                                    className="form-item"
+                                    name="senderMobileNumber"
+                                    rules={[
+                                      {
+                                        required: true,
+                                        message: "Enter Sender Mobile Number.",
+                                      },
+                                      {
+                                        min: 10,
+                                        max: 10,
+                                        message: "Mobile number must be 10 digit.",
+                                      },
+                                      {
+                                        pattern: /^[0-9\b]+$/,
+                                        message: "Only Numbers allowed",
+                                      },
+                                    ]}
+                                  >
+                                    <Input
+                                      size="large"
+                                      autoComplete="none"
+                                      placeholder="Sender Mobile Number"
+                                    />
+                                  </Form.Item>
+                                </Col>
+                                <Col md={2}>
+                                  <label className="form-label">Sender Email ID</label>
+                                  <Form.Item
+                                    className="form-item"
+                                    name="senderEmailID"
+                                    rules={[
+                                      {
+                                        required: true,
+                                        message: "Enter Sender Email ID.",
+                                      },
+                                      {
+                                        // type: "email",
+                                        pattern:
+                                          /^[^<>()[\]\\,;:\%#^\s@\"$&!@]+@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z0-9]+\.)+[a-zA-Z]{2,}))$/,
+                                        message: "Please enter valid E-mail",
+                                      },
+                                    ]}
+                                  >
+                                    <Input
+                                      size="large"
+                                      autoComplete="none"
+                                      placeholder="Sender Email ID"
+                                    />
+                                  </Form.Item>
+                                </Col>
+                              </Row>
+                            </Col>
+
+                            <Col md={12}>
+                              <label className="form-label">Message</label>
+                              <Form.Item
+                                className="form-item"
+                                name="senderMessage"
+                                rules={[
+                                  {
+                                    required: true,
+                                    message: "Enter Message.",
+                                  },
+
+                                  {
+                                    min: 3,
+                                    max: 100,
+                                    message: "Min 3 and max 100 characters allowed",
+                                  },
+                                ]}
+                              >
+                                <Input size="large" autoComplete="none" placeholder="Message" />
+                              </Form.Item>
+                            </Col>
+                            <Col md={12}>
+                              <h4 className="mb-3  ">Receiver Bank Details</h4>
+                            </Col>
+                            <Col md={6}>
+                              <label className="form-label">Receiver Country</label>
+                              <Form.Item
+                                className="form-item"
+                                name="receiverCountry"
+                                rules={[
+                                  {
+                                    required: true,
+                                    message: "Select Receiver Country",
+                                  },
+                                ]}
+                              >
+                                <Select
+                                  size="large"
+                                  autoComplete="none"
+                                  className="w-100"
+                                  placeholder="Select Receiver Country"
+                                  onChange={onChangeReceiverCountry}
+                                >
+                                  {state?.recvCountryList?.map((v, i) => {
+                                    return (
+                                      <Option key={i} value={v.recvCountry}>
+                                        {v.countryName}
+                                      </Option>
+                                    );
+                                  })}
+                                </Select>
+                              </Form.Item>
+                            </Col>
+                            <Col md={6}>
+                              <label className="form-label">Delivery Option</label>
+                              <Form.Item
+                                className="form-item"
+                                name="deliveryOption"
+                                rules={[
+                                  {
+                                    required: true,
+                                    message: "Enter Delivery Option.",
+                                  },
+                                ]}
+                              >
+                                <Select
+                                  size="large"
+                                  autoComplete="none"
+                                  className="w-100"
+                                  placeholder="Select Delivery Options"
+                                  onChange={onChangeDeliveryOptionHandler}
+                                >
+                                  {state.deliveryOptionsList.map((deliveryOption, i) => {
+                                    return (
+                                      <Option
+                                        key={i}
+                                        value={deliveryOption.recvModeCode}
+                                      >{`(${deliveryOption.recvMode}) ${deliveryOption.recvModeCode}`}</Option>
+                                    );
+                                  })}
+                                </Select>
+                              </Form.Item>
+                            </Col>
+
+                            <>
+                              {state.deliveryOption && (
+                                <>
+                                  {/* <Col md={12}>
+                                    <label className="form-label w-100">
+                                      Do you know the IFSC of your bank?
+                                    </label>
+                                    <Radio.Group
+                                      className="mb-24"
+                                      defaultValue="YES"
+                                      onChange={(val) => {
+                                        setState({
+                                          ifscCodeRadio: val.target.value === "YES" ? true : false,
+                                        });
+                                      }}
+                                    >
+                                      <Radio className=" " value="YES">
+                                        Yes
+                                      </Radio>
+                                      <Radio className=" " value="NO">
+                                        No
+                                      </Radio>
+                                    </Radio.Group>
+                                  </Col> */}
+
+                                  <>
+                                    {/* {state.ifscCodeRadio && (
+                                      <Col md={12}>
+                                        <label className="form-label">IFSC Code</label>
+                                        <Form.Item
+                                          className="form-item"
+                                          name="ifscCode"
+                                          rules={[
+                                            {
+                                              required: true,
+                                              message: "Enter IFSC Code.",
+                                            },
+                                          ]}
+                                        >
+                                          <Input
+                                            disabled={!state.ifscCodeRadio}
+                                            size="large"
+                                            autoComplete="none"
+                                            placeholder="Branch Code"
+                                            onChange={onChangeIfscCodeHandler}
+                                          />
+                                        </Form.Item>
+                                      </Col>
+                                    )} */}
+                                    <Col md={3}>
+                                      <label className="form-label">Bank Name</label>
+                                      <Form.Item
+                                        className="form-item"
+                                        name="bankName"
+                                        rules={[
+                                          {
+                                            required: true,
+                                            message: "Enter Bank Name.",
+                                          },
+                                        ]}
+                                      >
+                                        <Select
+                                          size="large"
+                                          autoComplete="none"
+                                          className="w-100"
+                                          getPopupContainer={(trigger) => trigger.parentNode}
+                                          showSearch
+                                          labelInValue
+                                          placeholder="Select Bank Name"
+                                          onChange={onChangeBankBranchState}
+                                        >
+                                          {state.bankNames.map((bank, i) => {
+                                            return (
+                                              <Option key={i} value={bank.bankName}>
+                                                <span
+                                                  bankCode={bank.bankCode}
+                                                  isSameBank={bank.isSameBank}
+                                                >
+                                                  {bank.bankName}
+                                                </span>
+                                              </Option>
+                                            );
+                                          })}
+                                        </Select>
+                                      </Form.Item>
+                                    </Col>
+                                    {/* <Col md={3}>
+                                      <label className="form-label">Bank Branch State</label>
+                                      <Form.Item
+                                        className="form-item"
+                                        name="bankBranchState"
+                                        rules={[
+                                          {
+                                            required: true,
+                                            message: "Enter Bank Branch State.",
+                                          },
+                                        ]}
+                                      >
+                                        <Select
+                                          disabled={state.ifscCodeRadio}
+                                          size="large"
+                                          autoComplete="none"
+                                          className="w-100"
+                                          placeholder="Select Bank Branch State"
+                                          // onChange={onChangeBankBranchCity}
+                                        >
+                                          {state.bankBranchStates.map((bankBranchState, i) => {
+                                            return (
+                                              <Option key={i} value={bankBranchState.state}>
+                                                {bankBranchState.state}
+                                              </Option>
+                                            );
+                                          })}
+                                        </Select>
+                                      </Form.Item>
+                                    </Col>
+                                    <Col md={3}>
+                                      <label className="form-label">Bank Branch City</label>
+                                      <Form.Item
+                                        className="form-item"
+                                        name="bankBranchCity"
+                                        rules={[
+                                          {
+                                            required: true,
+                                            message: "Enter Bank Branch City.",
+                                          },
+                                        ]}
+                                      >
+                                        <Select
+                                          disabled={state.ifscCodeRadio}
+                                          size="large"
+                                          autoComplete="none"
+                                          className="w-100"
+                                          placeholder="Select Bank Branch City"
+                                          onChange={onChangeBankBranchName}
+                                        >
+                                          {state.cityLists?.map((bankBranchCity, i) => {
+                                            return (
+                                              <Option key={i} value={bankBranchCity.city}>
+                                                {bankBranchCity.city}
+                                              </Option>
+                                            );
+                                          })}
+                                        </Select>
+                                      </Form.Item>
+                                    </Col>
+                                    <Col md={3}>
+                                      <label className="form-label">Bank Branch Name</label>
+                                      <Form.Item
+                                        className="form-item"
+                                        name="bankBranchName"
+                                        rules={[
+                                          {
+                                            required: true,
+                                            message: "Enter Bank Branch Name.",
+                                          },
+                                        ]}
+                                      >
+                                        <Select
+                                          disabled={state.ifscCodeRadio}
+                                          size="large"
+                                          autoComplete="none"
+                                          className="w-100"
+                                          placeholder="Select Bank Branch Name"
+                                          onChange={onChangeBankBranchNameSelect}
+                                        >
+                                          {state.branchLists.map((bank, i) => {
+                                            return (
+                                              <Option key={i} value={JSON.stringify(bank)}>
+                                                {bank.branchName}
+                                              </Option>
+                                            );
+                                          })}
+                                        </Select>
+                                      </Form.Item>
+                                    </Col> */}
+                                    <Col md={6}>
+                                        <label className="form-label">Bank Code</label>
+                                        <Form.Item
+                                          className="form-item"
+                                          name="bankCode"
+                                          rules={[
+                                            {
+                                              required: true,
+                                              message: "Enter Bank Code.",
+                                            },
+                                          ]}
+                                        >
+                                          <Input size="large" autoComplete="none"  />
+                                        </Form.Item>
+                                      </Col>
+                                      {/* <Col md={6}>
+                                        <label className="form-label">Bank Code</label>
+                                        <Form.Item className="form-item" name="branchCode">
+                                          <Input
+                                            size="large"
+                                            autoComplete="none"
+                                            placeholder="Branch Code"
+                                          />
+                                        </Form.Item>
+                                      </Col> */}
+                                    <Col md={6}>
+                                      <div className="">
+                                        <label className="form-label">Account Number</label>
+                                        <Form.Item
+                                          className="form-item"
+                                          name="accountNo"
+                                          rules={[
+                                            {
+                                              required: true,
+                                              message: "Please input your Account Number.",
+                                            },
+                                            ...inputValidations.accountNumber(
+                                              AuthReducer.recvCountryCode
+                                            ),
+                                          ]}
+                                        >
+                                          <Input.Password
+                                            size="large"
+                                            autoComplete="none"
+                                            placeholder="Enter your Account Number"
+                                          />
+                                        </Form.Item>
+                                      </div>
+                                    </Col>
+                                    <Col md={6}>
+                                      <div className="">
+                                        <label className="form-label">Confirm Account Number</label>
+                                        <Form.Item
+                                          className="form-item"
+                                          name="accConNum"
+                                          rules={[
+                                            {
+                                              required: true,
+                                              message: "Please input your Confirm Account Number.",
+                                            },
+
+                                            ({ getFieldValue }) => ({
+                                              validator(rule, value) {
+                                                if (
+                                                  !value ||
+                                                  getFieldValue("accountNo") === value
+                                                ) {
+                                                  return Promise.resolve();
+                                                }
+                                                return Promise.reject(
+                                                  "Account Number do not match!"
+                                                );
+                                              },
+                                            }),
+                                          ]}
+                                        >
+                                          <Input
+                                            size="large"
+                                            autoComplete="none"
+                                            placeholder="Re-enter your Account Number"
+                                          />
+                                        </Form.Item>
+                                      </div>
+                                    </Col>
+                                  </>
+                                </>
+                              )}
+                              {/* {state.recvCountryCode !== "NP" && (
+                                <BankComponent
+                                  state={state}
+                                  recvCountryCode={state.recvCountryCode}
+                                  onSelectBank={onChangeBankBranchState}
+                                  // onChangeAccountNumberHandler={onChangeAccountNumberHandler}
+                                />
+                              )} */}
+                              {/* {state.recvCountryCode !== "NP" && (
+                                  <>
+                                    <>
+                                      <Col md={3}>
+                                        <label className="form-label">Bank Name</label>
+                                        <Form.Item
+                                          className="form-item"
+                                          name="bankName"
+                                          rules={[
+                                            {
+                                              required: true,
+                                              message: "Enter Bank Name.",
+                                            },
+                                          ]}
+                                        >
+                                          <Select
+                                            size="large" autoComplete="none" 
+                                            className="w-100"
+                                            placeholder="Select Bank Name"
+                                            onChange={onChangeBankBranchState}
+                                          >
+                                            {state.bankNames.map((bank, i) => {
+                                              return (
+                                                <Option key={i} value={JSON.stringify(bank)}>
+                                                  {bank.bankName}
+                                                </Option>
+                                              );
+                                            })}
+                                          </Select>
+                                        </Form.Item>
+                                      </Col>
+                                      <Col md={3}>
+                                        <label className="form-label">Bank SWIFT Code</label>
+                                        <Form.Item
+                                          className="form-item"
+                                          name="bankSwiftCode"
+                                          rules={[
+                                            {
+                                              required: true,
+                                              message: "Enter Bank SWIFT Code.",
+                                            },
+                                          ]}
+                                        >
+                                          <Input size="large" autoComplete="none"  />
+                                        </Form.Item>
+                                      </Col>
+                                      <Col md={3}>
+                                        <label className="form-label">Bank Sort Code</label>
+                                        <Form.Item
+                                          className="form-item"
+                                          name="bankSortCode"
+                                          rules={[
+                                            {
+                                              required: true,
+                                              message: "Enter Bank Sort Code.",
+                                            },
+                                          ]}
+                                        >
+                                          <Input size="large" autoComplete="none"  />
+                                        </Form.Item>
+                                      </Col>
+                                      <Col md={3}>
+                                        <label className="form-label">Bank Address</label>
+                                        <Form.Item
+                                          className="form-item"
+                                          name="bankAddress"
+                                          rules={[
+                                            {
+                                              required: true,
+                                              message: "Enter Bank Address.",
+                                            },
+                                          ]}
+                                        >
+                                          <Input size="large" autoComplete="none"  />
+                                        </Form.Item>
+                                      </Col>
+
+                                      <Col md={6}>
+                                        <div className="">
+                                          <label className="form-label">
+                                            Account Number / IBAN Number 
+                                          </label>
+                                          <Form.Item
+                                            className="form-item"
+                                            name="accountNo"
+                                            rules={[
+                                              {
+                                                required: true,
+                                                message: "Please input your Account Number.",
+                                              },
+                                              ...inputValidations.accountNumber(
+                                                state.recvCountryCode,
+                                              ),
+                                            ]}
+                                          >
+                                            <Input.Password
+                                              size="large" autoComplete="none" 
+                                              placeholder="Enter your Account Number"
+                                            />
+                                          </Form.Item>
+                                        </div>
+                                      </Col>
+                                    </>
+                                  </>
+                                )} */}
+                            </>
+
+                            {/* <Col md={12}>
+                            <div className="">
+                              <label className="form-label">Account Type</label>
+                              <Form.Item
+                                className="form-item"
+                                name="accountType"
+                                rules={[
+                                  {
+                                    required: true,
+                                    message: "Please select Account Type",
+                                  },
+                                ]}
+                              >
+                                <Select
+                                  showSearch
+                                  className="w-100"
+                                  placeholder="Select Account Type"
+                                  size="large" autoComplete="none" 
+                                >
+                                  <Option key="ac1" value="S">
+                                    Saving
+                                  </Option>
+                                  <Option key="ac2" value="C">
+                                    Current / Checking
+                                  </Option>
+                                </Select>
+                              </Form.Item>
+                            </div>
+                          </Col> */}
+                          </Row>
+                        </Col>
+
+                        <Col md={12}>
+                          <Row className="justify-content-center">
+                            <Col md={12}>
+                              <h4 className="mb-3  ">Receiver Personal Details</h4>
+                            </Col>
+                            <Col md={12}>
+                              <Row className="justify-content-center">
+                                <Col md={4}>
+                                  <label className="form-label">First Name</label>
+                                  <Form.Item
+                                    className="form-item"
+                                    name="firstName"
+                                    rules={[
+                                      {
+                                        required: true,
+                                        message: "Enter First Name.",
+                                      },
+                                      {
+                                        min: 3,
+                                        message:
+                                          "First Name should be between 3 and 40 characters long",
+                                      },
+                                      {
+                                        max: 40,
+                                        message:
+                                          "First Name should be between 3 and 40 characters long",
+                                      },
+                                      {
+                                        pattern: /^[a-zA-Z]+$/,
+                                        message: "Please enter valid first name",
+                                      },
+                                    ]}
+                                  >
+                                    <Input
+                                      size="large"
+                                      autoComplete="none"
+                                      placeholder="Enter First Name"
+                                    />
+                                  </Form.Item>
+                                </Col>
+                                <Col md={4}>
+                                  <label className="form-label">Last Name</label>
+                                  <Form.Item
+                                    className="form-item"
+                                    name="lastName"
+                                    rules={[
+                                      {
+                                        required: true,
+                                        message: "Enter Last Name.",
+                                      },
+                                      {
+                                        min: 3,
+                                        message:
+                                          "Last Name should be between 3 and 40 characters long",
+                                      },
+                                      {
+                                        max: 40,
+                                        message:
+                                          "Last Name should be between 3 and 40 characters long",
+                                      },
+                                      {
+                                        pattern: /^[a-zA-Z]+$/,
+                                        message: "Please enter valid last name",
+                                      },
+                                    ]}
+                                  >
+                                    <Input
+                                      size="large"
+                                      autoComplete="none"
+                                      placeholder="Enter Last Name"
+                                    />
+                                  </Form.Item>
+                                </Col>
+                                <Col md={4}>
+                                  <label className="form-label">Nick Name</label>
+                                  <Form.Item
+                                    className="form-item"
+                                    name="nickName"
+                                    rules={[
+                                      {
+                                        required: true,
+                                        message: "Enter NickName.",
+                                      },
+                                      {
+                                        min: 3,
+                                        message: "Nick Name should be between 3 and 40 characters",
+                                      },
+                                      {
+                                        max: 40,
+                                        message: "Nick Name should be between 3 and 40 characters",
+                                      },
+                                      {
+                                        pattern: /^[a-zA-Z0-9]+$/,
+                                        message: "No Special Chars",
+                                      },
+                                    ]}
+                                  >
+                                    <Input
+                                      size="large"
+                                      autoComplete="none"
+                                      placeholder="Nick Name"
+                                    />
+                                  </Form.Item>
+                                </Col>
+                              </Row>
+                            </Col>
+
+                            <Col md={12}>
+                              <label className="form-label">Address</label>
+                              <Form.Item
+                                className="form-item"
+                                name="address1"
+                                rules={[
+                                  {
+                                    required: true,
+                                    message: "Enter Address.",
+                                  },
+                                  {
+                                    min: 10,
+                                    max: 300,
+                                    message: "Address should be between 10 and 300 characters",
+                                  },
+                                ]}
+                              >
+                                <Input.TextArea
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                      e.preventDefault();
+                                      if (!e.shiftKey) {
+                                        e.preventDefault();
+                                      }
+                                    }
+                                  }}
+                                  className="rq_textarea_address"
+                                  size="large"
+                                  autoComplete="none"
+                                  placeholder="Address"
+                                />
+                              </Form.Item>
+                            </Col>
+
+                            <Col md={3}>
+                              <label className="form-label">State</label>
+                              <Form.Item
+                                className="form-item"
+                                name="state"
+                                rules={[
+                                  {
+                                    required: true,
+                                    message: "Enter State.",
+                                  },
+                                ]}
+                              >
+                                <AutoComplete
+                                  filterOption={(inputValue, option) =>
+                                    option.value.toUpperCase().indexOf(inputValue.toUpperCase()) !==
+                                    -1
+                                  }
+                                  size="large"
+                                  autoComplete="none"
+                                  className="w-100"
+                                  placeholder="Select State"
+                                  onChange={onChangeState}
+                                >
+                                  {state.bankBranchStates.map((bankBranchState, i) => {
+                                    return (
+                                      <Option key={i} value={bankBranchState.state}>
+                                        {bankBranchState.state}
+                                      </Option>
+                                    );
+                                  })}
+                                </AutoComplete>
+                              </Form.Item>
+                            </Col>
+
+                            <Col md={3}>
+                              <label className="form-label">City</label>
+                              <Form.Item
+                                className="form-item"
+                                name="city"
+                                rules={[
+                                  {
+                                    required: true,
+                                    message: "Enter City.",
+                                  },
+                                ]}
+                              >
+                                <AutoComplete
+                                  filterOption={(inputValue, option) =>
+                                    option.value.toUpperCase().indexOf(inputValue.toUpperCase()) !==
+                                    -1
+                                  }
+                                  size="large"
+                                  autoComplete="none"
+                                  className="w-100"
+                                  placeholder="Select City"
+                                >
+                                  {state.bankBranchCities.map((bankBranchCity, i) => {
+                                    return (
+                                      <Option key={i} value={bankBranchCity.city}>
+                                        {bankBranchCity.city}
+                                      </Option>
+                                    );
+                                  })}
+                                </AutoComplete>
+                              </Form.Item>
+                            </Col>
+
+                            <Col md={3}>
+                              <label className="form-label">Pincode</label>
+                              <Form.Item
+                                className="form-item"
+                                name="zipCode"
+                                rules={[
+                                  {
+                                    required: true,
+                                    message: "Enter Pincode Code.",
+                                  },
+                                  // {
+                                  //   min: 6,
+                                  //   max: 6,
+                                  //   message: "Maximum 6 alphanumeric value",
+                                  // },
+                                  // {
+                                  //   pattern: /^(?=.*[0-9])(?=.*[a-zA-Z])([a-zA-Z0-9]+)$/,
+                                  //   message: "zipcode must be alphanumeric.",
+                                  // },
+                                  ...inputValidations.zipCode(state.recvCountryCode),
+                                  // {
+                                  //   min: 6,
+                                  //   message: "Minimum 6 Digits",
+                                  // },
+                                  // {
+                                  //   max: 6,
+                                  //   message: "Maximum 6 Digits",
+                                  // },
+                                  // {
+                                  //   pattern: /^[0-9\b]+$/,
+                                  //   message: "Only Numbers allowed",
+                                  // },
+                                ]}
+                              >
+                                <Input size="large" autoComplete="none" placeholder="Pincode" />
+                              </Form.Item>
+                            </Col>
+
+                            <Col md={3}>
+                              <label className="form-label">Country</label>
+                              <Form.Item
+                                className="form-item"
+                                name="country"
+                                rules={[
+                                  {
+                                    required: true,
+                                    message: "Enter Country.",
+                                  },
+                                ]}
+                              >
+                                <Select
+                                  disabled
+                                  size="large"
+                                  autoComplete="none"
+                                  className="w-100"
+                                  placeholder="Select Country"
+                                >
+                                  {state?.recvCountryList?.map((v, i) => {
+                                    return (
+                                      <Option key={i} value={v.recvCountry}>
+                                        {v.countryName}
+                                      </Option>
+                                    );
+                                  })}
+                                </Select>
+                              </Form.Item>
+                            </Col>
+
+                            <Col md={12}>
+                              <Row className="justify-content-center">
+                                <Col md={3}>
+                                  <label className="form-label">Email ID</label>
+                                  <Form.Item
+                                    className="form-item"
+                                    name="emailID"
+                                    rules={[
+                                      {
+                                        required: true,
+                                        message: "Enter Email ID.",
+                                      },
+                                      {
+                                        // type: "email",
+                                        pattern:
+                                          /^[^<>()[\]\\,;:\%#^\s@\"$&!@]+@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z0-9]+\.)+[a-zA-Z]{2,}))$/,
+                                        message: "Please enter valid E-mail",
+                                      },
+                                    ]}
+                                  >
+                                    <Input
+                                      size="large"
+                                      autoComplete="none"
+                                      placeholder="Email ID"
+                                    />
+                                  </Form.Item>
+                                </Col>
+                                <Col md={3}>
+                                  <label className="form-label">Country Code</label>
+                                  <Form.Item
+                                    className="form-item"
+                                    name="countryMobileCode"
+                                    rules={[
+                                      {
+                                        required: true,
+                                        message: "Enter Country Code",
+                                      },
+                                    ]}
+                                  >
+                                    <Select
+                                      size="large"
+                                      autoComplete="none"
+                                      className="w-100"
+                                      placeholder="Select Country Code"
+                                      showSearch
+                                      filterOption={(input, option) =>
+                                        (option?.children ?? "")
+                                          .toLowerCase()
+                                          .includes(input.toLowerCase())
+                                      }
+                                    >
+                                      {state.phoneCodes.map((phoneCode, i) => {
+                                        return (
+                                          <Option
+                                            key={i}
+                                            value={phoneCode.countryPhoneCode}
+                                          >{`(${phoneCode.countryPhoneCode}) ${phoneCode.countryName}`}</Option>
+                                        );
+                                      })}
+                                    </Select>
+                                  </Form.Item>
+                                </Col>
+                                <Col md={3}>
+                                  <label className="form-label">Mobile Number</label>
+                                  <Form.Item
+                                    className="form-item"
+                                    name="mobileNumber"
+                                    rules={[
+                                      {
+                                        required: true,
+                                        message: "Enter Sender Mobile Number.",
+                                      },
+                                      {
+                                        min: 10,
+                                        max: 10,
+                                        message: "Mobile number must be 10 digit.",
+                                      },
+                                      {
+                                        pattern: /^[0-9\b]+$/,
+                                        message: "Only Numbers allowed",
+                                      },
+                                    ]}
+                                  >
+                                    <Input
+                                      size="large"
+                                      autoComplete="none"
+                                      placeholder="Sender Mobile Number"
+                                    />
+                                  </Form.Item>
+                                </Col>
+                                <Col md={3}>
+                                  <label className="form-label">Phone No</label>
+                                  <Form.Item
+                                    className="form-item"
+                                    name="phoneNumber"
+                                    rules={[
+                                      {
+                                        pattern: /^[0-9\b]+$/,
+                                        message: "Only Numbers allowed",
+                                      },
+                                      {
+                                        min: 10,
+                                        max: 10,
+                                        message: "Phone number must be 10 digit.",
+                                      },
+                                    ]}
+                                  >
+                                    <Input
+                                      size="large"
+                                      autoComplete="none"
+                                      placeholder="Phone No"
+                                    />
+                                  </Form.Item>
+                                </Col>
+                              </Row>
+                            </Col>
+                          </Row>
+                        </Col>
+                        <Col>
+                          <Row>
+                            <Col md={3}>
+                              <div>
+                                <label className="form-label">Word Verification</label>
+                                <div className="w-100 d-flex mb-3">
+                                  <div className="me-3">
+                                    <img
+                                      src={`data:image/jpeg;base64,${captchaImg}`}
+                                      alt="captcha"
+                                    />
+                                  </div>
+                                  <div
+                                    className="d-flex align-items-center   my-3"
+                                    style={{ cursor: "pointer" }}
+                                    onClick={getCaptcha}
+                                  >
+                                    <img src={logorefresh} alt="refresh" className="me-2" />
+                                    <span className="fs-12 fw-600">Refresh Code</span>
+                                  </div>
+                                </div>
+                                <Form.Item
+                                  className="form-item"
+                                  name="captcha"
+                                  rules={[
+                                    {
+                                      required: true,
+                                      message: "Enter Captcha.",
+                                    },
+                                  ]}
+                                >
+                                  <Input
+                                    size="large"
+                                    autoComplete="none"
+                                    placeholder="Enter the text shown in the Image"
+                                  />
+                                </Form.Item>
+                              </div>
+                            </Col>
+
+                            <Col></Col>
+                          </Row>
+                        </Col>
+                        <Col md={12} className="d-flex flex-column">
+                          <div>
+                            <div className="d-flex justify-content-end">
+                              <Link
+                                to={"/"}
+                                className="btn btn-sm btn-outline-light text-white me-2 my-3"
+                              >
+                                Back
+                              </Link>
+                              <button
+                                className="btn btn-light text-primary btn-sm my-3"
+                                type="submit"
+                                // onClick={() => setIsICICI(true)}
+                              >
+                                Submit
+                              </button>
+                            </div>
+                          </div>
+                        </Col>
+                      </Row>
+                    </Form>
+                  </div>
+                </Col>
+              </Row>
+            </div>
+          </div>
+        </div>
+      </div>
+      </Spinner>
+    </>
+  );
+}
+
+export default RequestMoneyFlowOne;
+//start
