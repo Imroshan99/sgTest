@@ -1,0 +1,4 @@
+ {
+                            pattern: /^(?!^\d+$)[A-Za-z0-9@&*()\-_+;:"'\/|\\%#.,?\s]*$/,
+                            message: "only alphanumeric & only speficied charecter allowed ",
+                          },
