@@ -1,0 +1,13 @@
+         1.Forgot password page give links or options to login, register, go back to the previous page, home page.
+
+2. As soon as the user clicks on “Send OTP” tab a validation should display as OTP sent on registered email.
+
+3.If the user adds wrong OTP the validation displayed is OTP expired,  the validation should display as Please enter correct OTP.
+
+4.If the user enters wrong OTP the timer stops and if the user enters correct OTP after entering the  wrong OTP the validation displayed is “OTP you have entered is expired”.
+
+5.On unlock account there is no option to go back to the login page , register, go back to the previous page, home page.
+
+6.OTP not triggered on email as well as SMS, resend OTP on email not triggering.
+
+7.On the login page give an option to see the typed password in the password field.
